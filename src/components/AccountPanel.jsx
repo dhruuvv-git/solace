@@ -29,13 +29,12 @@ function Toggle({ checked, onChange, label, disabled }) {
   );
 }
 
-export default function AccountPanel({ onSignOut }) {
+export default function AccountPanel({ onSignOut, mimiStatus }) {
   const { user, setUser, signOut } = useAuth();
   const toast = useToast();
   const [name, setName] = useState(user.name);
   const [nameErr, setNameErr] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [devices, setDevices] = useState(null);
   const [settings, setSettings] = useState(undefined);
   const [delOpen, setDelOpen] = useState(false);
   const [pw, setPw] = useState('');
@@ -43,7 +42,6 @@ export default function AccountPanel({ onSignOut }) {
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
-    try { setDevices((await Api.devices()).devices); } catch { setDevices([]); }
     try { setSettings((await Api.settings()).settings); } catch { setSettings(null); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -99,20 +97,11 @@ export default function AccountPanel({ onSignOut }) {
 
       <div className={card}>
         <h3 className="text-base font-bold text-[#1a1028] flex items-center gap-2"><MonitorSmartphone className="w-4 h-4 text-purple-600" />Linked devices</h3>
-        <p className="text-xs text-zinc-600 mt-1">Each Mimi you connect gets its own key. Remove one to sign that browser out.</p>
-        <div className="mt-4 space-y-2" data-testid="devices">
-          {devices === null && <p className="text-xs text-zinc-500">Loading…</p>}
-          {devices?.length === 0 && <p className="text-xs text-zinc-500">No Mimi is connected to this account yet.</p>}
-          {devices?.map((d) => (
-            <div key={d.id} className="p-4 rounded-xl bg-[#fcfbff] border border-violet-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold text-[#1a1028]">{d.deviceName}</div>
-                <div className="text-[11px] font-mono text-zinc-500 mt-0.5">Connected {new Date(d.createdAt).toLocaleString('en-IN')} · last seen {new Date(d.lastUsedAt).toLocaleString('en-IN')} · expires {new Date(d.expiresAt).toLocaleDateString('en-IN')}</div>
-              </div>
-              <button onClick={async () => { try { await Api.revokeDevice(d.id); toast('Device signed out.'); load(); } catch (e) { toast(e.message, 'bad'); } }}
-                className="px-3 py-1.5 rounded-lg bg-violet-50 hover:bg-rose-500/15 hover:text-rose-700 text-zinc-700 text-xs font-mono transition-colors cursor-pointer self-start sm:self-auto">Sign out device</button>
-            </div>
-          ))}
+        <p className="text-xs text-zinc-600 mt-1">Mimi runs locally in this browser. Device status is detected from the installed extension; Solace does not maintain a cloud device list.</p>
+        <div className="mt-4 p-4 rounded-xl bg-[#fcfbff] border border-violet-100" data-testid="devices">
+          {mimiStatus?.state === 'checking' && <p className="text-xs text-zinc-500">Checking this browser…</p>}
+          {(mimiStatus?.state === 'missing' || mimiStatus?.state === 'unsupported') && <p className="text-xs text-zinc-600">Mimi isn’t detected in this browser. Install the extension and open the Mimi Extension tab to connect it.</p>}
+          {(mimiStatus?.state === 'installed' || mimiStatus?.state === 'update') && <><p className="text-sm font-semibold text-[#1a1028]">Mimi is installed in this browser{mimiStatus.version ? ` · v${mimiStatus.version}` : ''}</p><p className="text-xs text-zinc-600 mt-1">{mimiStatus.account?.status === 'signed-in' && mimiStatus.account.userId === user.id ? `Connected to ${user.email}.` : 'Extension is available; sync this website sign-in from the Mimi Extension tab.'}</p></>}
         </div>
       </div>
 

@@ -41,6 +41,9 @@ export async function addHistory(e: Omit<HistoryEntry, 'id' | 'ts'>): Promise<vo
     if (!s.scanHistory) return;
     await idb.put('history', { ...e, id: uid('h'), ts: Date.now() });
     const all = await idb.getAll<HistoryEntry>('history');
+    // Keep the most recent five locally retained images to avoid filling browser storage.
+    const images = all.filter((x) => x.imageData).sort((a, b) => b.ts - a.ts);
+    if (images.length > 5) await idb.deleteMany('history', images.slice(5).map((x) => x.id));
     if (all.length > 100) {
       const old = all.sort((a, b) => a.ts - b.ts).slice(0, all.length - 100).map((x) => x.id);
       await idb.deleteMany('history', old);

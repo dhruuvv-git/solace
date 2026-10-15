@@ -65,6 +65,9 @@ export const Mimi = {
   link: (code) => send({ type: 'TL_LINK', code }, 15000),
   unlink: (userId) => send(userId ? { type: 'TL_UNLINK', userId } : { type: 'TL_UNLINK' }),
   localAccount: (user) => send(user ? { type: 'TL_LOCAL_ACCOUNT', user } : { type: 'TL_LOCAL_SIGNOUT' }),
+  history: () => send({ type: 'TL_HISTORY_LIST' }),
+  historyImage: (id) => send({ type: 'TL_HISTORY_IMAGE', id }),
+  clearHistory: () => send({ type: 'TL_HISTORY_CLEAR' }),
 };
 
 /** Live extension status; re-checks when the window regains focus (e.g. after installing). */

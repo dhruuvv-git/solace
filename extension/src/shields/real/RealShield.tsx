@@ -98,7 +98,8 @@ function ImageChecker({ img, setImg, incomingError, clearIncomingError }: {
       const userRefs = await listRefs('known-fake').catch(() => [] as RefEntry[]);
       const r = await analyzeImageBytes(img.bytes, { name: img.name, caption, userHashes: userRefs, threshold: settings.threshold, signal: ac.signal, onProgress: (step, f) => setBusy({ step, f }) });
       setResult(r);
-      addHistory({ shield: 'real', title: img.sample ? `${img.name} (sample)` : 'Image check', outcome: `${VERDICT[r.fusion.verdict].title}, ${r.fusion.confidence} confidence (P = ${fmt(r.fusion.pFake)})`, tone: r.fusion.verdict === 'likely-fake' ? 'bad' : 'good' });
+      const format = sniffFormat(img.bytes);
+      addHistory({ shield: 'real', title: img.sample ? `${img.name} (sample)` : 'Image check', outcome: `${VERDICT[r.fusion.verdict].title}, ${r.fusion.confidence} confidence (P = ${fmt(r.fusion.pFake)})`, tone: r.fusion.verdict === 'likely-fake' ? 'bad' : 'good', ...(!img.sample && img.bytes.byteLength <= 8 * 1024 * 1024 && ['jpeg', 'png', 'webp'].includes(format) ? { imageData: bytesToDataUrl(img.bytes, `image/${format}`) } : {}) });
     } catch (e) {
       setError((e as Error).message);
     } finally {

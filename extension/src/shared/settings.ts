@@ -16,7 +16,7 @@ export interface Settings {
   floatingButton: boolean;
   /** Record hashed sender + score for the Pattern Detector (Abuse Shield & Kind checks). */
   patternTracking: boolean;
-  /** Keep a local list of scan summaries (never message content). */
+  /** Keep local scan summaries and up to five recent checked images for optional reporting. */
   scanHistory: boolean;
   /** Save Safety Copilot analyses to the Evidence Locker automatically (user-initiated analyses only). */
   autoSaveSafetyEvidence: boolean;

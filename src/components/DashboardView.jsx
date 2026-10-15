@@ -518,8 +518,8 @@ export default function DashboardView({ tab = 'overview', onTab, mimiStatus, aut
           </div>
         )}
 
-        {tab === 'mimi' && <MimiPanel status={mimiStatus} autoLink={autoLink} />}
-        {tab === 'account' && <AccountPanel onSignOut={handleLogout} />}
+        {tab === 'mimi' && <MimiPanel status={mimiStatus} autoLink={autoLink} onReport={() => go('report')} />}
+        {tab === 'account' && <AccountPanel onSignOut={handleLogout} mimiStatus={mimiStatus} />}
       </main>
     </div>
   );

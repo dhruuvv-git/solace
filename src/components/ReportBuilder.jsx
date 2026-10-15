@@ -105,6 +105,32 @@ export default function ReportBuilder({ records, onSealed }) {
 
   const set = (k) => (v) => setD((x) => ({ ...x, [k]: v && v.target ? (v.target.type === 'checkbox' ? v.target.checked : v.target.value) : v }));
   useEffect(() => { saveDraft(user.id, d); }, [user.id, d]);
+  useEffect(() => {
+    const pending = window.solaceMimiReportDraft;
+    delete window.solaceMimiReportDraft;
+    if (!pending) return;
+    const summary = `${pending.title || 'Mimi check'} — ${pending.outcome || 'Result reviewed'}. This summary came from Mimi’s local recent checks; add the incident facts and date you know.`;
+    setD((current) => ({ ...current, description: current.description ? `${current.description}\n${summary}` : summary }));
+    if (typeof pending.imageData === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(pending.imageData)) {
+      (async () => {
+        try {
+          const response = await fetch(pending.imageData);
+          const blob = await response.blob();
+          if (blob.size > 8 * 1024 * 1024) return;
+          const file = new File([blob], `mimi-${pending.shield || 'check'}-evidence.${blob.type.split('/')[1] || 'jpg'}`, { type: blob.type });
+          const hash = (await sealFile(user.id, file)).hash;
+          const url = URL.createObjectURL(file);
+          setPhotos((current) => [...current, { id: `p_mimi_${Date.now().toString(36)}`, name: file.name, size: file.size, type: file.type, lastModified: file.lastModified, hash, caption: 'Image checked by Mimi', isImage: true, url }]);
+          toast('Mimi’s checked image was added to this report and sealed in your Evidence Vault.');
+          onSealed?.();
+        } catch (e) { toast(`Could not add Mimi’s image: ${e.message}`, 'bad'); }
+      })();
+    } else {
+      toast('Mimi’s result was added. Add a screenshot or other proof in Photos & evidence.');
+    }
+  // consume a one-time draft only when entering the report builder
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => { photosRef.current = photos; }, [photos]);
   useEffect(() => () => photosRef.current.forEach((p) => URL.revokeObjectURL(p.url)), []);
 

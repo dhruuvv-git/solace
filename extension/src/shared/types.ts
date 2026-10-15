@@ -447,7 +447,7 @@ export interface GameState {
 }
 
 /* ------------------------------------------------------------------ */
-/* Scan history (summaries only - never content)                       */
+/* Scan history (summaries plus a small local image cache for reports) */
 /* ------------------------------------------------------------------ */
 
 export interface HistoryEntry {
@@ -457,6 +457,8 @@ export interface HistoryEntry {
   title: string;
   outcome: string;
   tone: 'good' | 'warn' | 'bad' | 'neutral';
+  /** Optional local image for a later, explicit report action. Never sent unless requested by the website. */
+  imageData?: string;
 }
 
 export type AnyResult =

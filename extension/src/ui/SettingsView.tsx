@@ -69,7 +69,7 @@ export function SettingsView() {
 
       <section className="section panel">
         <h3>Evidence and history</h3>
-        <Switch label="Keep a list of recent checks" checked={s.scanHistory} onChange={(v) => set({ scanHistory: v })} description="Only the check type and result are kept (never message text or images), up to 100 entries." />
+        <Switch label="Keep a list of recent checks" checked={s.scanHistory} onChange={(v) => set({ scanHistory: v })} description="Message text is never kept. Up to 100 results and five checked images stay on this device for optional reporting." />
         <Switch label="Save safety checks to the Evidence Locker automatically" checked={s.autoSaveSafetyEvidence} onChange={(v) => set({ autoSaveSafetyEvidence: v, safetyIntroSeen: true })} description="Only for checks you start in “Am I safe?”." />
         <Switch label="Include a screenshot when saving from a page" checked={s.includeScreenshots} onChange={(v) => set({ includeScreenshots: v })} />
       </section>

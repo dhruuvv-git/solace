@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Download, ExternalLink, Link2, Puzzle, RefreshCw, Send, ShieldCheck, Smartphone, Unlink } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { DOWNLOAD_URL, Mimi } from '../lib/mimi';
@@ -97,11 +97,47 @@ const STEPS = [
   ['Pin & connect', 'Pin Mimi from the puzzle icon, reload this page and press Connect.'],
 ];
 
-export default function MimiPanel({ status, autoLink }) {
+export default function MimiPanel({ status, autoLink, onReport }) {
   const toast = useToast();
   const [text, setText] = useState('');
   const [hint, setHint] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [reportingId, setReportingId] = useState(null);
   const installed = status.state === 'installed' || status.state === 'update';
+
+  const refreshHistory = useCallback(async () => {
+    if (!installed) return;
+    const result = await Mimi.history();
+    if (result?.ok && Array.isArray(result.history)) setHistory(result.history);
+  }, [installed]);
+  useEffect(() => {
+    void refreshHistory();
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') refreshHistory(); }, 3000);
+    window.addEventListener('focus', refreshHistory);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', refreshHistory); };
+  }, [refreshHistory]);
+
+  const reportCheck = async (entry) => {
+    setReportingId(entry.id);
+    try {
+      const imageResult = entry.hasImage ? await Mimi.historyImage(entry.id) : null;
+      if (entry.hasImage && (!imageResult?.ok || !imageResult.imageData)) throw new Error('Mimi could not retrieve the saved image. Try again.');
+      window.solaceMimiReportDraft = { title: entry.title, outcome: entry.outcome, shield: entry.shield, imageData: imageResult?.imageData || null };
+      onReport?.();
+    } catch (e) { toast(e.message, 'bad'); }
+    finally { setReportingId(null); }
+  };
+  const clearChecks = async () => {
+    setHistoryBusy(true);
+    try {
+      const result = await Mimi.clearHistory();
+      if (!result?.ok) throw new Error(result?.error || 'Mimi did not respond.');
+      setHistory([]);
+      toast('Recent checks cleared in Mimi and Solace.');
+    } catch (e) { toast(`Could not clear Mimi history: ${e.message}`, 'bad'); }
+    finally { setHistoryBusy(false); }
+  };
 
   const ask = async (mode) => {
     if (!text.trim()) { toast('Paste a message first.', 'bad'); return; }
@@ -148,6 +184,23 @@ export default function MimiPanel({ status, autoLink }) {
           <p className="text-[11px] font-mono text-zinc-500 mt-4 flex items-center gap-2"><Smartphone className="w-3.5 h-3.5" />Desktop Chrome, Edge or Brave · WhatsApp Web & Instagram</p>
         </div>
       </div>
+
+      <section className={card} aria-labelledby="mimi-recent-checks">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h3 id="mimi-recent-checks" className="text-base font-bold text-[#1a1028]">Recent checks</h3><p className="text-xs text-zinc-600 mt-1">Results stay in Mimi on this browser. Message text isn’t kept; up to five checked images stay locally for optional report attachments.</p></div>
+          <button type="button" onClick={clearChecks} disabled={!installed || historyBusy || history.length === 0} className="px-3 py-2 rounded-lg text-xs font-mono text-zinc-600 hover:text-rose-700 hover:bg-rose-50 disabled:opacity-40 disabled:cursor-not-allowed">{historyBusy ? 'Clearing…' : 'Clear checks'}</button>
+        </div>
+        {!installed ? <p className="mt-4 text-sm text-zinc-500">Install Mimi to see checks from the extension.</p> : history.length === 0 ? <p className="mt-4 text-sm text-zinc-500">No recent checks yet. Checks you run in Mimi will appear here.</p> : (
+          <ul className="mt-4 divide-y divide-violet-100" data-testid="mimi-history">
+            {history.slice(0, 30).map((entry) => <li key={entry.id} className="py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+              <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-mono border ${entry.tone === 'bad' ? 'bg-rose-50 border-rose-200 text-rose-700' : entry.tone === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-violet-50 border-violet-200 text-violet-700'}`}>{entry.outcome}</span>
+              <span className="grow text-sm text-zinc-700">{entry.title}</span>
+              <span className="text-[11px] text-zinc-500">{new Date(entry.ts).toLocaleString()}</span>
+              <button type="button" onClick={() => reportCheck(entry)} disabled={reportingId === entry.id} className="shrink-0 px-3 py-2 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-mono disabled:opacity-50">{reportingId === entry.id ? 'Opening…' : entry.hasImage ? 'Report with image' : 'Report this'}</button>
+            </li>)}
+          </ul>
+        )}
+      </section>
 
       <div className={card}>
         <h3 className="text-base font-bold text-[#1a1028] flex items-center gap-2"><Puzzle className="w-4 h-4 text-purple-600" />Install in five steps</h3>

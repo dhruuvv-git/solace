@@ -11,6 +11,8 @@ import { analyzeToxicity } from '../engine/toxicity';
 import { LEXICON } from '../engine/data/lexicon';
 import { sniffFormat } from '../engine/metadata-analysis';
 import { saveEvidence } from '../evidence/evidence-store';
+import { clearHistory, listHistory } from '../shared/local-data';
+import { idb } from '../shared/idb';
 import { recordSenderMessage } from '../shared/local-data';
 import {
   LIMITS, base64ToBytes, bytesToBase64, platformFromUrl, validateToBackground,
@@ -274,6 +276,18 @@ chrome.runtime.onMessageExternal.addListener((raw, sender, sendResponse) => {
   }
   if (msg.type === 'TL_LOCAL_SIGNOUT') {
     setWebsiteAccount(null).then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (msg.type === 'TL_HISTORY_LIST') {
+    listHistory().then((history) => sendResponse({ ok: true, history: history.map(({ imageData, ...entry }) => ({ ...entry, hasImage: !!imageData })) }),(e) => sendResponse({ ok: false, error: (e as Error).message }));
+    return true;
+  }
+  if (msg.type === 'TL_HISTORY_IMAGE') {
+    idb.get<{ imageData?: string } & { id: string }>('history', msg.id).then((entry) => sendResponse({ ok: true, imageData: entry?.imageData ?? null }),(e) => sendResponse({ ok: false, error: (e as Error).message }));
+    return true;
+  }
+  if (msg.type === 'TL_HISTORY_CLEAR') {
+    clearHistory().then(() => sendResponse({ ok: true }),(e) => sendResponse({ ok: false, error: (e as Error).message }));
     return true;
   }
   const windowId = sender.tab?.windowId;

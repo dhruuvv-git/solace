@@ -124,7 +124,7 @@ export function Overview() {
         <div className="row-between"><h3>Recent checks</h3>
           {history.length > 0 && <button className="btn ghost sm" onClick={async () => { if (await confirm('Clear recent checks?', 'The list of recent check results will be deleted.', 'Clear')) { await clearHistory(); bump(); } }}>Clear</button>}
         </div>
-        {history.length === 0 ? <p className="muted small">Your recent results will show here (results only — never the content).</p> : (
+        {history.length === 0 ? <p className="muted small">Your recent results will show here. Message text isn’t saved; up to five checked images stay on this device for optional reports.</p> : (
           <div className="list">{history.slice(0, 8).map((h) => (
             <div className="list-item small" key={h.id}>
               <span className={`badge ${h.tone === 'good' ? 'good' : h.tone === 'warn' ? 'warn' : h.tone === 'bad' ? 'bad' : ''}`}>{h.outcome}</span>

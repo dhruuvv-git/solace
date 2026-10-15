@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { listEvidence } from '../src/evidence/evidence-store';
-import { listPatterns } from '../src/shared/local-data';
+import { addHistory, listHistory, listPatterns } from '../src/shared/local-data';
 
 type Listener = (...a: unknown[]) => unknown;
 const L: Record<string, Listener[]> = {};
@@ -126,6 +126,17 @@ describe('service worker', () => {
   it('website: HELLO from an allowed origin returns name and version', async () => {
     const r = await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HELLO' }, { origin: 'http://127.0.0.1:5500', tab: { windowId: 3 } }, res); });
     expect(r).toMatchObject({ ok: true, assistant: 'Mimi', version: '9.9.9' });
+  });
+
+  it('website: reads and clears the same local recent-check history as Mimi', async () => {
+    await addHistory({ shield: 'kind', title: 'Received message', outcome: 'Hurtful language', tone: 'warn', imageData: 'data:image/png;base64,AA==' });
+    const read = await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HISTORY_LIST' }, { origin: 'https://solacee-nine.vercel.app', tab: { windowId: 3 } }, res); });
+    expect(read).toMatchObject({ ok: true, history: [{ title: 'Received message', outcome: 'Hurtful language', hasImage: true }] });
+    const image = await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HISTORY_IMAGE', id: (read as { history: { id: string }[] }).history[0].id }, { origin: 'https://solacee-nine.vercel.app', tab: { windowId: 3 } }, res); });
+    expect(image).toMatchObject({ ok: true, imageData: 'data:image/png;base64,AA==' });
+    const cleared = await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HISTORY_CLEAR' }, { origin: 'https://solacee-nine.vercel.app', tab: { windowId: 3 } }, res); });
+    expect(cleared).toMatchObject({ ok: true });
+    expect(await listHistory()).toEqual([]);
   });
 
   it('website: HELLO reflects when Mimi is open and clears when it closes', async () => {
