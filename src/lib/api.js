@@ -51,11 +51,33 @@ export const Api = {
   incident: async (b) => {
     const sess = (() => { try { return JSON.parse(localStorage.getItem('solace_session')); } catch { return null; } })();
     if (sess) {
-      const t = b.discoveredAt || Date.now();
-      sess.user.incident = { type: b.type, discoveredAt: t };
+      if (b.clear) {
+        delete sess.user.incident;
+      } else {
+        const incident = { ...(sess.user.incident || {}) };
+        if (b.type !== undefined) incident.type = b.type;
+        if (b.discoveredAt !== undefined) incident.discoveredAt = b.discoveredAt;
+        if (!Number.isFinite(incident.discoveredAt)) incident.discoveredAt = Date.now();
+        if (Object.prototype.hasOwnProperty.call(b, 'noticeSentAt')) {
+          incident.noticeSentAt = b.noticeSentAt;
+        } else if (!Object.prototype.hasOwnProperty.call(incident, 'noticeSentAt')) {
+          incident.noticeSentAt = null;
+        }
+        sess.user.incident = incident;
+      }
       localStorage.setItem('solace_session', JSON.stringify(sess));
+
+      const users = (() => { try { return JSON.parse(localStorage.getItem('solace_users') || '{}'); } catch { return {}; } })();
+      if (users[sess.user.email]) {
+        users[sess.user.email].user = sess.user;
+        localStorage.setItem('solace_users', JSON.stringify(users));
+      }
+
+      // AuthContext merges user updates, so explicitly pass null after clearing.
+      const user = b.clear ? { ...sess.user, incident: null } : sess.user;
+      return { user };
     }
-    return { user: sess?.user ?? {} };
+    return { user: {} };
   },
   deleteAccount: async () => {
     localStorage.removeItem('solace_session');
