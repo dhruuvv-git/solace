@@ -459,6 +459,8 @@ export interface HistoryEntry {
   tone: 'good' | 'warn' | 'bad' | 'neutral';
   /** Optional local image for a later, explicit report action. Never sent unless requested by the website. */
   imageData?: string;
+  /** Optional message text/content for display and report drafting. */
+  text?: string;
 }
 
 export type AnyResult =

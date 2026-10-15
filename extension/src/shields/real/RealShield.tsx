@@ -62,7 +62,7 @@ export function RealShield() {
             <button className="btn primary" disabled={!text.trim()} onClick={() => {
               const r = analyzeMisinformation(text);
               setMisinfo(r);
-              addHistory({ shield: 'real', title: 'Forwarded message', outcome: `${r.level} hoax score (p = ${fmt(r.p)})`, tone: r.level === 'high' ? 'bad' : r.level === 'medium' ? 'warn' : 'neutral' });
+              addHistory({ shield: 'real', title: 'Forwarded message', outcome: `${r.level} hoax score (p = ${fmt(r.p)})`, tone: r.level === 'high' ? 'bad' : r.level === 'medium' ? 'warn' : 'neutral', text: text.slice(0, 500) });
             }}>Check message</button>
             {text && <button className="btn ghost" onClick={() => { setText(''); setMisinfo(null); }}>Clear</button>}
           </div>

@@ -74,7 +74,9 @@ export function KindShield() {
     const inc = takeIncoming('kind');
     if (inc) {
       setReceived(inc.text); setSender(inc.source?.senderLabel ?? ''); setSource(inc.source);
-      setRecResult(analyzeToxicity(inc.text, lex)); setPattern(null);
+      const r = analyzeToxicity(inc.text, lex);
+      setRecResult(r); setPattern(null);
+      addHistory({ shield: 'kind', title: 'Received message', outcome: LEVEL[r.level].title, tone: r.level === 'none' ? 'good' : r.level === 'mild' ? 'warn' : 'bad', text: inc.text.slice(0, 500) });
     }
   }, [incoming, takeIncoming, lex]);
 
@@ -84,7 +86,7 @@ export function KindShield() {
     const r = analyzeToxicity(draft, lex);
     setDraftResult(r); setDismissed(false);
     setAiReq({ mode: 'draft', text: draft, local: { level: r.level, categories: r.categories, words: r.matches.map((m) => m.matchedText) } }); setAiRun((n) => n + 1); setAiFor('draft');
-    addHistory({ shield: 'kind', title: 'Draft check', outcome: LEVEL[r.level].title, tone: r.level === 'none' ? 'good' : r.level === 'mild' ? 'warn' : 'bad' });
+    addHistory({ shield: 'kind', title: 'Draft check', outcome: LEVEL[r.level].title, tone: r.level === 'none' ? 'good' : r.level === 'mild' ? 'warn' : 'bad', text: draft.slice(0, 500) });
   };
 
   return (
@@ -139,7 +141,7 @@ export function KindShield() {
           const r = analyzeToxicity(received, lex);
           setRecResult(r); setPattern(null);
           setAiReq({ mode: 'received', text: received, local: { level: r.level, categories: r.categories, words: r.matches.map((m) => m.matchedText) } }); setAiRun((n) => n + 1); setAiFor('received');
-          addHistory({ shield: 'kind', title: 'Received message', outcome: LEVEL[r.level].title, tone: r.level === 'none' ? 'good' : r.level === 'mild' ? 'warn' : 'bad' });
+          addHistory({ shield: 'kind', title: 'Received message', outcome: LEVEL[r.level].title, tone: r.level === 'none' ? 'good' : r.level === 'mild' ? 'warn' : 'bad', text: received.slice(0, 500) });
         }}>Check message</button></div>
         {aiFor === 'received' && <AiAnswerPanel request={aiReq} runKey={aiRun} />}
         {recResult && (

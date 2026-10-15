@@ -123,7 +123,7 @@ export default function MimiPanel({ status, autoLink, onReport }) {
     try {
       const imageResult = entry.hasImage ? await Mimi.historyImage(entry.id) : null;
       if (entry.hasImage && (!imageResult?.ok || !imageResult.imageData)) throw new Error('Mimi could not retrieve the saved image. Try again.');
-      window.solaceMimiReportDraft = { title: entry.title, outcome: entry.outcome, shield: entry.shield, imageData: imageResult?.imageData || null };
+      window.solaceMimiReportDraft = { title: entry.title, outcome: entry.outcome, shield: entry.shield, text: entry.text || null, imageData: imageResult?.imageData || null };
       onReport?.();
     } catch (e) { toast(e.message, 'bad'); }
     finally { setReportingId(null); }
@@ -187,16 +187,26 @@ export default function MimiPanel({ status, autoLink, onReport }) {
 
       <section className={card} aria-labelledby="mimi-recent-checks">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><h3 id="mimi-recent-checks" className="text-base font-bold text-[#1a1028]">Recent checks</h3><p className="text-xs text-zinc-600 mt-1">Results stay in Mimi on this browser. Message text isn’t kept; up to five checked images stay locally for optional report attachments.</p></div>
-          <button type="button" onClick={clearChecks} disabled={!installed || historyBusy || history.length === 0} className="px-3 py-2 rounded-lg text-xs font-mono text-zinc-600 hover:text-rose-700 hover:bg-rose-50 disabled:opacity-40 disabled:cursor-not-allowed">{historyBusy ? 'Clearing…' : 'Clear checks'}</button>
+          <div>
+            <h3 id="mimi-recent-checks" className="text-base font-bold text-[#1a1028]">Mimi’s stored messages &amp; recent checks</h3>
+            <p className="text-xs text-zinc-600 mt-1">Synced live from Mimi on this browser. Message text and up to five checked images stay on this device for one-click reports.</p>
+          </div>
+          <button type="button" onClick={clearChecks} disabled={!installed || historyBusy || history.length === 0} className="px-3 py-2 rounded-lg text-xs font-mono text-zinc-600 hover:text-rose-700 hover:bg-rose-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">{historyBusy ? 'Clearing…' : 'Clear checks'}</button>
         </div>
-        {!installed ? <p className="mt-4 text-sm text-zinc-500">Install Mimi to see checks from the extension.</p> : history.length === 0 ? <p className="mt-4 text-sm text-zinc-500">No recent checks yet. Checks you run in Mimi will appear here.</p> : (
+        {!installed ? <p className="mt-4 text-sm text-zinc-500">Install Mimi to see checks and stored messages from the extension.</p> : history.length === 0 ? <p className="mt-4 text-sm text-zinc-500">No stored messages or checks yet. Messages you check or save in Mimi will appear here.</p> : (
           <ul className="mt-4 divide-y divide-violet-100" data-testid="mimi-history">
-            {history.slice(0, 30).map((entry) => <li key={entry.id} className="py-3 flex flex-col sm:flex-row sm:items-center gap-3">
-              <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-mono border ${entry.tone === 'bad' ? 'bg-rose-50 border-rose-200 text-rose-700' : entry.tone === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-violet-50 border-violet-200 text-violet-700'}`}>{entry.outcome}</span>
-              <span className="grow text-sm text-zinc-700">{entry.title}</span>
-              <span className="text-[11px] text-zinc-500">{new Date(entry.ts).toLocaleString()}</span>
-              <button type="button" onClick={() => reportCheck(entry)} disabled={reportingId === entry.id} className="shrink-0 px-3 py-2 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-mono disabled:opacity-50">{reportingId === entry.id ? 'Opening…' : entry.hasImage ? 'Report with image' : 'Report this'}</button>
+            {history.slice(0, 30).map((entry) => <li key={entry.id} className="py-3.5 flex flex-col sm:flex-row sm:items-start gap-3">
+              <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-mono border mt-0.5 ${entry.tone === 'bad' ? 'bg-rose-50 border-rose-200 text-rose-700' : entry.tone === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-violet-50 border-violet-200 text-violet-700'}`}>{entry.outcome}</span>
+              <div className="grow min-w-0">
+                <div className="text-sm font-semibold text-zinc-800">{entry.title}</div>
+                {entry.text && (
+                  <p className="text-xs text-zinc-700 mt-1.5 line-clamp-2 italic font-sans bg-violet-50/60 px-3 py-2 rounded-xl border border-violet-100/70">
+                    “{entry.text}”
+                  </p>
+                )}
+                <div className="text-[11px] text-zinc-400 mt-1">{new Date(entry.ts).toLocaleString()}</div>
+              </div>
+              <button type="button" onClick={() => reportCheck(entry)} disabled={reportingId === entry.id} className="shrink-0 px-3 py-2 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-mono disabled:opacity-50 cursor-pointer">{reportingId === entry.id ? 'Opening…' : entry.hasImage ? 'Report with image' : 'Report this'}</button>
             </li>)}
           </ul>
         )}

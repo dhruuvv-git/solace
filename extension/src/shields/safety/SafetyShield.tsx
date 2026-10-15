@@ -59,7 +59,12 @@ export function SafetyShield() {
 
   useEffect(() => {
     const inc = takeIncoming('safety');
-    if (inc) { setText(inc.text); setSender(inc.source?.senderLabel ?? ''); setSource(inc.source); setR(null); setSavedId(null); }
+    if (inc) {
+      setText(inc.text); setSender(inc.source?.senderLabel ?? ''); setSource(inc.source); setSavedId(null);
+      const res = analyzeThreat(inc.text);
+      setR(res);
+      addHistory({ shield: 'safety', title: 'Safety check', outcome: `${LEVEL[res.level].title}${res.primary ? ` (${CAT_NAME[res.primary]})` : ''}`, tone: res.level === 'none' || res.level === 'low' ? 'neutral' : res.level === 'medium' ? 'warn' : 'bad', text: inc.text.slice(0, 500) });
+    }
   }, [incoming, takeIncoming]);
 
   const analyze = async (cat: ThreatCategory | null = override, allowAutoSave = true) => {
@@ -76,7 +81,7 @@ export function SafetyShield() {
       setAiReq({ mode: 'safety', text, anonymous, minor, local: { category: res.primary, level: res.level, risk: res.risk, emergency: res.emergency.triggered, warning_signs: res.warningSigns.map((s) => s.id), abusive_words: res.toxicityMatches.map((m) => m.text) } });
       setAiRun((n) => n + 1);
     }
-    addHistory({ shield: 'safety', title: 'Safety check', outcome: `${LEVEL[res.level].title}${res.primary ? ` (${CAT_NAME[res.primary]})` : ''}`, tone: res.level === 'none' || res.level === 'low' ? 'neutral' : res.level === 'medium' ? 'warn' : 'bad' });
+    addHistory({ shield: 'safety', title: 'Safety check', outcome: `${LEVEL[res.level].title}${res.primary ? ` (${CAT_NAME[res.primary]})` : ''}`, tone: res.level === 'none' || res.level === 'low' ? 'neutral' : res.level === 'medium' ? 'warn' : 'bad', text: text.slice(0, 500) });
     if (!allowAutoSave) return;
     if (!settings.safetyIntroSeen) { setIntro(true); return; }
     if (settings.autoSaveSafetyEvidence && res.level !== 'none') await doSave(res);

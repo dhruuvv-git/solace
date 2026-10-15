@@ -7,7 +7,7 @@ import 'fake-indexeddb/auto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { listEvidence } from '../src/evidence/evidence-store';
+import { listEvidence, saveEvidence } from '../src/evidence/evidence-store';
 import { addHistory, listHistory, listPatterns } from '../src/shared/local-data';
 
 type Listener = (...a: unknown[]) => unknown;
@@ -128,12 +128,23 @@ describe('service worker', () => {
     expect(r).toMatchObject({ ok: true, assistant: 'Mimi', version: '9.9.9' });
   });
 
-  it('website: reads and clears the same local recent-check history as Mimi', async () => {
-    await addHistory({ shield: 'kind', title: 'Received message', outcome: 'Hurtful language', tone: 'warn', imageData: 'data:image/png;base64,AA==' });
-    const read = await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HISTORY_LIST' }, { origin: 'https://solacee-nine.vercel.app', tab: { windowId: 3 } }, res); });
-    expect(read).toMatchObject({ ok: true, history: [{ title: 'Received message', outcome: 'Hurtful language', hasImage: true }] });
-    const image = await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HISTORY_IMAGE', id: (read as { history: { id: string }[] }).history[0].id }, { origin: 'https://solacee-nine.vercel.app', tab: { windowId: 3 } }, res); });
-    expect(image).toMatchObject({ ok: true, imageData: 'data:image/png;base64,AA==' });
+  it('website: reads and clears the same local recent-check history and stored messages as Mimi', async () => {
+    await addHistory({ shield: 'kind', title: 'Received message', outcome: 'Hurtful language', tone: 'warn', imageData: 'data:image/png;base64,AA==', text: 'You are bad' });
+    await saveEvidence({ text: 'I know where you live', platform: 'whatsapp', url: 'https://web.whatsapp.com/', senderLabel: 'Unknown', screenshot: 'data:image/png;base64,BB==' });
+    const read = (await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HISTORY_LIST' }, { origin: 'https://solacee-nine.vercel.app', tab: { windowId: 3 } }, res); })) as { ok: boolean; history: { id: string; text?: string; hasImage?: boolean; title: string }[] };
+    expect(read.ok).toBe(true);
+    expect(read.history.length).toBeGreaterThanOrEqual(2);
+    expect(read.history.some((h) => h.text === 'You are bad' && h.hasImage)).toBe(true);
+    expect(read.history.some((h) => h.text === 'I know where you live' && h.hasImage)).toBe(true);
+
+    const evItem = read.history.find((h) => h.id.startsWith('ev_'))!;
+    const evImg = await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HISTORY_IMAGE', id: evItem.id }, { origin: 'https://solacee-nine.vercel.app', tab: { windowId: 3 } }, res); });
+    expect(evImg).toMatchObject({ ok: true, imageData: 'data:image/png;base64,BB==' });
+
+    const histItem = read.history.find((h) => h.id.startsWith('h_'))!;
+    const histImg = await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HISTORY_IMAGE', id: histItem.id }, { origin: 'https://solacee-nine.vercel.app', tab: { windowId: 3 } }, res); });
+    expect(histImg).toMatchObject({ ok: true, imageData: 'data:image/png;base64,AA==' });
+
     const cleared = await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HISTORY_CLEAR' }, { origin: 'https://solacee-nine.vercel.app', tab: { windowId: 3 } }, res); });
     expect(cleared).toMatchObject({ ok: true });
     expect(await listHistory()).toEqual([]);

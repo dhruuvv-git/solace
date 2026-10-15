@@ -109,8 +109,9 @@ export default function ReportBuilder({ records, onSealed }) {
     const pending = window.solaceMimiReportDraft;
     delete window.solaceMimiReportDraft;
     if (!pending) return;
-    const summary = `${pending.title || 'Mimi check'} — ${pending.outcome || 'Result reviewed'}. This summary came from Mimi’s local recent checks; add the incident facts and date you know.`;
-    setD((current) => ({ ...current, description: current.description ? `${current.description}\n${summary}` : summary }));
+    const msgSnippet = pending.text ? `\n\nStored Message Evidence:\n"${pending.text}"` : '';
+    const summary = `${pending.title || 'Mimi check'} — ${pending.outcome || 'Result reviewed'}.${msgSnippet}\n\nThis summary came from Mimi’s stored messages and checks; add the incident facts and date you know.`;
+    setD((current) => ({ ...current, description: current.description ? `${current.description}\n\n${summary}` : summary }));
     if (typeof pending.imageData === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(pending.imageData)) {
       (async () => {
         try {
@@ -126,7 +127,7 @@ export default function ReportBuilder({ records, onSealed }) {
         } catch (e) { toast(`Could not add Mimi’s image: ${e.message}`, 'bad'); }
       })();
     } else {
-      toast('Mimi’s result was added. Add a screenshot or other proof in Photos & evidence.');
+      toast(pending.text ? 'Mimi’s stored message was added to this report.' : 'Mimi’s result was added. Add a screenshot or other proof in Photos & evidence.');
     }
   // consume a one-time draft only when entering the report builder
   // eslint-disable-next-line react-hooks/exhaustive-deps

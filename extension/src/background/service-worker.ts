@@ -8,12 +8,13 @@
  * Messages from content scripts are validated; page text is only data.
  */
 import { analyzeToxicity } from '../engine/toxicity';
+import { analyzeThreat } from '../engine/threat-analysis';
+import { analyzeMisinformation } from '../engine/misinformation';
 import { LEXICON } from '../engine/data/lexicon';
 import { sniffFormat } from '../engine/metadata-analysis';
-import { saveEvidence } from '../evidence/evidence-store';
-import { clearHistory, listHistory } from '../shared/local-data';
+import { listEvidence, saveEvidence } from '../evidence/evidence-store';
+import { addHistory, clearHistory, listHistory, recordSenderMessage } from '../shared/local-data';
 import { idb } from '../shared/idb';
-import { recordSenderMessage } from '../shared/local-data';
 import {
   LIMITS, base64ToBytes, bytesToBase64, platformFromUrl, validateToBackground,
   originAllowed, validateFromWebsite,
@@ -279,16 +280,71 @@ chrome.runtime.onMessageExternal.addListener((raw, sender, sendResponse) => {
     return true;
   }
   if (msg.type === 'TL_HISTORY_LIST') {
-    listHistory().then((history) => sendResponse({ ok: true, history: history.map(({ imageData, ...entry }) => ({ ...entry, hasImage: !!imageData })) }),(e) => sendResponse({ ok: false, error: (e as Error).message }));
+    Promise.all([listHistory(), listEvidence().catch(() => [])]).then(([hist, evs]) => {
+      const histItems = hist.map(({ imageData, ...entry }) => ({
+        ...entry,
+        hasImage: !!imageData,
+      }));
+      const evItems = evs.map((e) => ({
+        id: e.id,
+        ts: new Date(e.timestamp || e.createdAt).getTime(),
+        shield: 'safety' as const,
+        title: e.senderLabel ? `Saved message from ${e.senderLabel}` : (e.platform && e.platform !== 'manual' ? `Saved message (${e.platform})` : 'Saved message in Evidence Locker'),
+        outcome: e.riskLevel && e.riskLevel !== 'none' ? `${e.riskLevel.toUpperCase()} risk${e.category && e.category !== 'none' ? ` (${e.category})` : ''}` : (e.category && e.category !== 'none' ? e.category : 'Stored evidence'),
+        tone: (e.riskLevel === 'high' || e.riskLevel === 'emergency' ? 'bad' : e.riskLevel === 'medium' ? 'warn' : 'good') as 'bad' | 'warn' | 'good' | 'neutral',
+        text: e.text || '',
+        hasImage: !!e.screenshot,
+      }));
+      const all = [...evItems, ...histItems].sort((a, b) => b.ts - a.ts);
+      sendResponse({ ok: true, history: all });
+    }).catch((e) => sendResponse({ ok: false, error: (e as Error).message }));
     return true;
   }
   if (msg.type === 'TL_HISTORY_IMAGE') {
-    idb.get<{ imageData?: string } & { id: string }>('history', msg.id).then((entry) => sendResponse({ ok: true, imageData: entry?.imageData ?? null }),(e) => sendResponse({ ok: false, error: (e as Error).message }));
+    const fetchImg = msg.id.startsWith('ev_')
+      ? idb.get<{ screenshot?: string } & { id: string }>('evidence', msg.id).then((entry) => entry?.screenshot ?? null)
+      : idb.get<{ imageData?: string } & { id: string }>('history', msg.id).then((entry) => entry?.imageData ?? null);
+    fetchImg.then((imageData) => sendResponse({ ok: true, imageData }), (e) => sendResponse({ ok: false, error: (e as Error).message }));
     return true;
   }
   if (msg.type === 'TL_HISTORY_CLEAR') {
     clearHistory().then(() => sendResponse({ ok: true }),(e) => sendResponse({ ok: false, error: (e as Error).message }));
     return true;
+  }
+  if (msg.type === 'TL_CHECK') {
+    void (async () => {
+      try {
+        const s = await getSettings();
+        if (msg.mode === 'kind') {
+          const tox = analyzeToxicity(msg.text, s.customLexicon.length ? [...LEXICON, ...s.customLexicon] : LEXICON);
+          await addHistory({
+            shield: 'kind',
+            title: 'Kindness check',
+            outcome: tox.level === 'none' ? 'No hurtful language' : tox.level === 'mild' ? 'Might be unkind' : 'Hurtful language',
+            tone: tox.level === 'none' ? 'good' : tox.level === 'mild' ? 'warn' : 'bad',
+            text: msg.text.slice(0, 500),
+          });
+        } else if (msg.mode === 'safety') {
+          const thr = analyzeThreat(msg.text);
+          await addHistory({
+            shield: 'safety',
+            title: 'Safety check',
+            outcome: thr.level === 'none' || thr.level === 'low' ? 'Low risk' : thr.level === 'medium' ? 'Medium risk' : 'High risk',
+            tone: thr.level === 'none' || thr.level === 'low' ? 'good' : thr.level === 'medium' ? 'warn' : 'bad',
+            text: msg.text.slice(0, 500),
+          });
+        } else {
+          const mis = analyzeMisinformation(msg.text);
+          await addHistory({
+            shield: 'real',
+            title: 'Forward check',
+            outcome: `${mis.level} hoax score`,
+            tone: mis.level === 'high' ? 'bad' : mis.level === 'medium' ? 'warn' : 'neutral',
+            text: msg.text.slice(0, 500),
+          });
+        }
+      } catch { /* ignore */ }
+    })();
   }
   const windowId = sender.tab?.windowId;
   const opening = openPanel(windowId);

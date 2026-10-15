@@ -137,7 +137,7 @@ export function validateFromWebsite(m: unknown): FromWebsite | null {
   }
   if (o.type === 'TL_LOCAL_SIGNOUT') return { type: 'TL_LOCAL_SIGNOUT' };
   if (o.type === 'TL_HISTORY_LIST' || o.type === 'TL_HISTORY_CLEAR') return { type: o.type };
-  if (o.type === 'TL_HISTORY_IMAGE') return typeof o.id === 'string' && /^h_[A-Za-z0-9_-]{1,80}$/.test(o.id) ? { type: 'TL_HISTORY_IMAGE', id: o.id } : null;
+  if (o.type === 'TL_HISTORY_IMAGE') return typeof o.id === 'string' && /^(h|ev)_[A-Za-z0-9_-]{1,80}$/.test(o.id) ? { type: 'TL_HISTORY_IMAGE', id: o.id } : null;
   if (o.type === 'TL_CHECK') return ['misinfo', 'kind', 'safety'].includes(o.mode as string) && typeof o.text === 'string' && o.text.trim().length > 0 && o.text.length <= LIMITS.text ? (o as FromWebsite) : null;
   return null;
 }

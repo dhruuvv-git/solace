@@ -91,7 +91,15 @@ export function Overview() {
           <textarea rows={3} value={text} onChange={(e) => { setText(e.target.value); setQuick(null); }} placeholder="Anything you’re unsure about" />
         </label>
         <div className="row">
-          <button className="btn primary" disabled={!text.trim()} onClick={() => setQuick({ mis: analyzeMisinformation(text), tox: analyzeToxicity(text, lex), thr: analyzeThreat(text) })}>Check</button>
+          <button className="btn primary" disabled={!text.trim()} onClick={() => {
+            const mis = analyzeMisinformation(text);
+            const tox = analyzeToxicity(text, lex);
+            const thr = analyzeThreat(text);
+            setQuick({ mis, tox, thr });
+            const outcome = thr.primary ? `Threat: ${thr.level}` : tox.level !== 'none' ? `Language: ${tox.level}` : `Hoax: ${mis.level}`;
+            const tone = thr.level === 'emergency' || thr.level === 'high' || tox.level === 'severe' || mis.level === 'high' ? 'bad' : thr.level === 'medium' || tox.level === 'hurtful' || mis.level === 'medium' ? 'warn' : 'good';
+            addHistory({ shield: 'safety', title: 'Quick check', outcome, tone, text: text.slice(0, 500) }).then(() => bump()).catch(() => {});
+          }}>Check</button>
           <button className="btn" onClick={() => go('real')}><Icon name="upload" size={15} />Check an image</button>
         </div>
         {quick && (
@@ -124,11 +132,11 @@ export function Overview() {
         <div className="row-between"><h3>Recent checks</h3>
           {history.length > 0 && <button className="btn ghost sm" onClick={async () => { if (await confirm('Clear recent checks?', 'The list of recent check results will be deleted.', 'Clear')) { await clearHistory(); bump(); } }}>Clear</button>}
         </div>
-        {history.length === 0 ? <p className="muted small">Your recent results will show here. Message text isn’t saved; up to five checked images stay on this device for optional reports.</p> : (
+        {history.length === 0 ? <p className="muted small">Your recent results will show here. Message text and up to five checked images stay on this device for optional reports.</p> : (
           <div className="list">{history.slice(0, 8).map((h) => (
             <div className="list-item small" key={h.id}>
               <span className={`badge ${h.tone === 'good' ? 'good' : h.tone === 'warn' ? 'warn' : h.tone === 'bad' ? 'bad' : ''}`}>{h.outcome}</span>
-              <span className="grow muted">{h.title}</span>
+              <span className="grow muted">{h.title}{h.text ? `: “${h.text.slice(0, 35)}…”` : ''}</span>
               <span className="xs muted">{new Date(h.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
           ))}</div>
