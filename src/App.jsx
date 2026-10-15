@@ -12,7 +12,7 @@ import { navigate, safeNext, useRoute } from './lib/router';
 import { Mimi, useMimiStatus } from './lib/mimi';
 import './index.css';
 
-const DASH_TABS = ['overview', 'vault', 'report', 'crisis', 'mimi', 'deadlines', 'account'];
+const DASH_TABS = ['overview', 'vault', 'report', 'crisis', 'aftercare', 'mimi', 'deadlines', 'account'];
 
 function Loading({ label = 'Opening Solace' }) {
   return (

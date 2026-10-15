@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutDashboard, ShieldCheck, Clock, FileText, PhoneCall, ArrowRight, Lock, Copy, Check, LogOut, Flame,
   Sparkles, FileCheck, ExternalLink, Puzzle, UserRound, Menu, X, Trash2, Download, BadgeCheck, TimerReset, Send,
+  HeartHandshake,
 } from 'lucide-react';
 import { Api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -12,6 +13,7 @@ import { CONCERNS } from '../lib/concerns';
 import MimiPanel from './MimiPanel';
 import AccountPanel from './AccountPanel';
 import ReportBuilder from './ReportBuilder';
+import AftercarePanel from './AftercarePanel';
 import { useToast } from './Toaster';
 
 const HOUR = 3600000;
@@ -119,6 +121,7 @@ export default function DashboardView({ tab = 'overview', onTab, mimiStatus, aut
     { id: 'vault', label: 'Evidence Vault', icon: ShieldCheck },
     { id: 'report', label: 'Incident Report', icon: FileText },
     { id: 'crisis', label: 'Emergency Support', icon: PhoneCall },
+    { id: 'aftercare', label: 'Aftercare', icon: HeartHandshake },
     { id: 'mimi', label: 'Mimi Extension', icon: Puzzle },
     { id: 'deadlines', label: 'Takedown Deadlines', icon: Clock },
     { id: 'account', label: 'Account', icon: UserRound },
@@ -518,6 +521,7 @@ export default function DashboardView({ tab = 'overview', onTab, mimiStatus, aut
           </div>
         )}
 
+        {tab === 'aftercare' && <AftercarePanel user={user} onGoReport={() => go('report')} />}
         {tab === 'mimi' && <MimiPanel status={mimiStatus} autoLink={autoLink} onReport={() => go('report')} />}
         {tab === 'account' && <AccountPanel onSignOut={handleLogout} mimiStatus={mimiStatus} />}
       </main>
