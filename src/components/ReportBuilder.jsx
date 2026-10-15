@@ -9,6 +9,7 @@ import { formatSize, sealFile, sha256Hex } from '../lib/vault';
 import {
   AUTHORITIES, DESCRIBE_PROMPTS, REPORT_TYPES, buildReport, clearDraft, emptyDraft, gaps, loadDraft, reportText, saveDraft, toLocalInput,
 } from '../lib/report';
+import { generatePdfReport } from '../lib/pdfReport';
 import { useToast } from './Toaster';
 
 const card = 'p-6 rounded-2xl bg-white border border-violet-100 shadow-[0_4px_24px_rgba(124,58,237,0.07)]';
@@ -106,29 +107,52 @@ export default function ReportBuilder({ records, onSealed }) {
   const set = (k) => (v) => setD((x) => ({ ...x, [k]: v && v.target ? (v.target.type === 'checkbox' ? v.target.checked : v.target.value) : v }));
   useEffect(() => { saveDraft(user.id, d); }, [user.id, d]);
   useEffect(() => {
+    // 1. Consume pending from window if passed in-app
     const pending = window.solaceMimiReportDraft;
     delete window.solaceMimiReportDraft;
-    if (!pending) return;
-    const msgSnippet = pending.text ? `\n\nStored Message Evidence:\n"${pending.text}"` : '';
-    const summary = `${pending.title || 'Mimi check'} — ${pending.outcome || 'Result reviewed'}.${msgSnippet}\n\nThis summary came from Mimi’s stored messages and checks; add the incident facts and date you know.`;
-    setD((current) => ({ ...current, description: current.description ? `${current.description}\n\n${summary}` : summary }));
-    if (typeof pending.imageData === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(pending.imageData)) {
-      (async () => {
-        try {
-          const response = await fetch(pending.imageData);
-          const blob = await response.blob();
-          if (blob.size > 8 * 1024 * 1024) return;
-          const file = new File([blob], `mimi-${pending.shield || 'check'}-evidence.${blob.type.split('/')[1] || 'jpg'}`, { type: blob.type });
-          const hash = (await sealFile(user.id, file)).hash;
-          const url = URL.createObjectURL(file);
-          setPhotos((current) => [...current, { id: `p_mimi_${Date.now().toString(36)}`, name: file.name, size: file.size, type: file.type, lastModified: file.lastModified, hash, caption: 'Image checked by Mimi', isImage: true, url }]);
-          toast('Mimi’s checked image was added to this report and sealed in your Evidence Vault.');
-          onSealed?.();
-        } catch (e) { toast(`Could not add Mimi’s image: ${e.message}`, 'bad'); }
-      })();
-    } else {
-      toast(pending.text ? 'Mimi’s stored message was added to this report.' : 'Mimi’s result was added. Add a screenshot or other proof in Photos & evidence.');
+    if (pending) {
+      const msgSnippet = pending.text ? `\n\nStored Message Evidence:\n"${pending.text}"` : '';
+      const summary = `${pending.title || 'Mimi check'} — ${pending.outcome || 'Result reviewed'}.${msgSnippet}\n\nThis summary came from Mimi’s stored messages and checks; add the incident facts and date you know.`;
+      setD((current) => ({ ...current, description: current.description ? `${current.description}\n\n${summary}` : summary }));
+      if (typeof pending.imageData === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(pending.imageData)) {
+        (async () => {
+          try {
+            const response = await fetch(pending.imageData);
+            const blob = await response.blob();
+            if (blob.size > 8 * 1024 * 1024) return;
+            const file = new File([blob], `mimi-${pending.shield || 'check'}-evidence.${blob.type.split('/')[1] || 'jpg'}`, { type: blob.type });
+            const hash = (await sealFile(user.id, file)).hash;
+            const url = URL.createObjectURL(file);
+            setPhotos((current) => [...current, { id: `p_mimi_${Date.now().toString(36)}`, name: file.name, size: file.size, type: file.type, lastModified: file.lastModified, hash, caption: 'Image checked by Mimi', isImage: true, url }]);
+            toast('Mimi’s checked image was added to this report and sealed in your Evidence Vault.');
+            onSealed?.();
+          } catch (e) { toast(`Could not add Mimi’s image: ${e.message}`, 'bad'); }
+        })();
+      } else {
+        toast(pending.text ? 'Mimi’s stored message was added to this report.' : 'Mimi’s result was added. Add a screenshot or other proof in Photos & evidence.');
+      }
+      return;
     }
+
+    // 2. Consume from URL query parameters (e.g. from Mimi extension "Open in website")
+    try {
+      const hash = window.location.hash || '';
+      const q = hash.includes('?') ? hash.split('?')[1] : window.location.search.slice(1);
+      if (q) {
+        const params = Object.fromEntries(new URLSearchParams(q));
+        if (params.from === 'mimi' && (params.title || params.text)) {
+          const msgSnippet = params.text ? `\n\nFlagged Harmful Message Content:\n"${params.text}"` : '';
+          const summary = `${params.title || 'Mimi check'} — ${params.outcome || 'Flagged harmful'}.${msgSnippet}\n\nTransferred directly from Mimi's recent checks flagged harmful.`;
+          setD((current) => ({
+            ...current,
+            description: current.description ? `${current.description}\n\n${summary}` : summary,
+            threats: params.tone === 'bad' ? true : current.threats,
+          }));
+          toast('Mimi’s flagged harmful check was transferred directly into this report.');
+          window.history.replaceState(null, '', '#/dashboard/report');
+        }
+      }
+    } catch { /* ignore */ }
   // consume a one-time draft only when entering the report builder
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -193,6 +217,14 @@ export default function ReportBuilder({ records, onSealed }) {
     const url = URL.createObjectURL(new Blob([text()], { type: 'text/plain;charset=utf-8' }));
     const a = Object.assign(document.createElement('a'), { href: url, download: `solace-incident-report-${new Date().toISOString().slice(0, 10)}.txt` });
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  };
+  const handlePdf = () => {
+    try {
+      const filename = generatePdfReport(report);
+      toast(`Downloaded ${filename}`);
+    } catch (e) {
+      toast(`Could not generate PDF: ${e.message}`, 'bad');
+    }
   };
   const startOver = () => {
     if (!window.confirm('Clear this report and start again? Your Evidence Vault is not affected.')) return;
@@ -390,7 +422,8 @@ export default function ReportBuilder({ records, onSealed }) {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 space-y-3">
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => window.print()} disabled={!canGenerate} className={primaryBtn}><Printer className="w-4 h-4" />Print / Save as PDF</button>
+              <button onClick={handlePdf} disabled={!canGenerate} className={primaryBtn}><FileText className="w-4 h-4" />Save as PDF</button>
+              <button onClick={() => window.print()} disabled={!canGenerate} className={softBtn}><Printer className="w-4 h-4" />Print</button>
               <button onClick={copy} disabled={!canGenerate} className={softBtn}>{copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}{copied ? 'Copied!' : 'Copy text'}</button>
               <button onClick={downloadTxt} disabled={!canGenerate} className={softBtn}><Download className="w-4 h-4" />Download .txt</button>
             </div>
@@ -445,7 +478,12 @@ export default function ReportBuilder({ records, onSealed }) {
             <button onClick={() => goStep(step + 1)} disabled={!canNext} className={primaryBtn}>Next: {STEPS[step + 1]}<ArrowRight className="w-4 h-4" /></button>
           </div>
         )}
-        {step === STEPS.length - 1 && <button onClick={() => window.print()} disabled={!canGenerate} className={primaryBtn}><Printer className="w-4 h-4" />Print / Save as PDF</button>}
+        {step === STEPS.length - 1 && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.print()} disabled={!canGenerate} className={softBtn}><Printer className="w-4 h-4" />Print</button>
+            <button onClick={handlePdf} disabled={!canGenerate} className={primaryBtn}><FileText className="w-4 h-4" />Save as PDF</button>
+          </div>
+        )}
       </div>
 
       {canGenerate && createPortal(<div className="sol-print-root"><ReportDocument r={report} /></div>, document.body)}

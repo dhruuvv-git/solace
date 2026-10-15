@@ -112,7 +112,7 @@ export default function OnboardingView({ next }) {
         <span className="sol-eyebrow sol-eyebrow--dark">Golden hour</span>
         <h1 style={h1}>When did you find it?</h1>
         <p style={lead}>
-          The first hour matters most. Solace starts a clock from the moment you discovered it, then tracks the platform’s legal deadline once you send a takedown notice.
+          The first 2 hours matter most. Solace starts a clock from the moment you discovered it, then tracks the platform’s legal deadline once you send a takedown notice.
           You can change or clear this from your dashboard.
         </p>
         <div role="radiogroup" aria-label="When did you find it" style={{ display: 'grid', gap: 12, marginTop: 32, maxWidth: 640 }}>

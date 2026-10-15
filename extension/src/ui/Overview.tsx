@@ -9,7 +9,7 @@ import type { HistoryEntry, SenderPattern } from '../shared/types';
 import { useLexicon } from '../shields/kind/KindShield';
 import { useApp, type View } from './app-context';
 import { Icon, useConfirm } from './components';
-import { isExtension } from './env';
+import { isExtension, openWebsite } from './env';
 import { APP } from '../shared/app-config';
 
 const SHIELDS: { view: View; icon: string; title: string; body: string }[] = [
@@ -45,7 +45,7 @@ function useTabStatus() {
 }
 
 export function Overview() {
-  const { go, refreshKey, bump, mode } = useApp();
+  const { go, refreshKey, bump, mode, settings } = useApp();
   const lex = useLexicon();
   const [text, setText] = useState('');
   const [quick, setQuick] = useState<null | { mis: ReturnType<typeof analyzeMisinformation>; tox: ReturnType<typeof analyzeToxicity>; thr: ReturnType<typeof analyzeThreat> }>(null);
@@ -129,8 +129,37 @@ export function Overview() {
       </section>
 
       <section className="section">
-        <div className="row-between"><h3>Recent checks</h3>
-          {history.length > 0 && <button className="btn ghost sm" onClick={async () => { if (await confirm('Clear recent checks?', 'The list of recent check results will be deleted.', 'Clear')) { await clearHistory(); bump(); } }}>Clear</button>}
+        <div className="row-between">
+          <h3>Recent checks</h3>
+          <div className="row" style={{ gap: 6 }}>
+            {history.length > 0 && (
+              <button
+                className="btn primary sm"
+                title="Open recent checks in the Solace website to draft a report"
+                onClick={() => {
+                  const harmful = history.filter((h) => h.tone === 'bad' || h.tone === 'warn');
+                  const target = harmful[0] || history[0];
+                  const url = `${settings.websiteUrl || APP.websiteUrl}#/dashboard/report?from=mimi&title=${encodeURIComponent(target.title)}&outcome=${encodeURIComponent(target.outcome)}&tone=${encodeURIComponent(target.tone)}${target.text ? `&text=${encodeURIComponent(target.text)}` : ''}`;
+                  openWebsite(url);
+                }}
+              >
+                Open in website
+              </button>
+            )}
+            {history.length > 0 && (
+              <button
+                className="btn ghost sm"
+                onClick={async () => {
+                  if (await confirm('Clear recent checks?', 'The list of recent check results will be deleted.', 'Clear')) {
+                    await clearHistory();
+                    bump();
+                  }
+                }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
         {history.length === 0 ? <p className="muted small">Your recent results will show here. Message text and up to five checked images stay on this device for optional reports.</p> : (
           <div className="list">{history.slice(0, 8).map((h) => (

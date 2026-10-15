@@ -106,7 +106,7 @@ export default function SolutionSection({ onGetStarted }) {
               lineHeight: 1.7,
               fontWeight: 400,
             }}>
-              A privacy-first response workspace for the first hour after discovery.
+              A privacy-first response workspace for the first 2 hours after discovery.
             </p>
           </FadeUp>
         </div>

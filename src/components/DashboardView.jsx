@@ -15,7 +15,7 @@ import ReportBuilder from './ReportBuilder';
 import { useToast } from './Toaster';
 
 const HOUR = 3600000;
-const GOLDEN_MS = HOUR;
+const GOLDEN_MS = 2 * HOUR; // Official 2-hour rapid response window
 const NCII_MS = 2 * HOUR; // IT Rules 3(2)(b) as amended in 2026
 const SOURCES = [
   ['IT Rules 2026 explained (iPleaders)', 'https://blog.ipleaders.in/it-rules-2026/'],
@@ -241,7 +241,7 @@ export default function DashboardView({ tab = 'overview', onTab, mimiStatus, aut
               <div className={`md:col-span-1 ${card} flex flex-col justify-between`} data-testid="golden-hour">
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-mono tracking-widest text-zinc-600 uppercase">Golden Hour Window</span>
+                    <span className="text-xs font-mono tracking-widest text-zinc-600 uppercase">2-Hour Golden Window</span>
                     <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600"><Flame className={`w-5 h-5 ${incident && goldenLeft > 0 ? 'animate-pulse' : ''}`} /></div>
                   </div>
                   {incident ? (
@@ -251,18 +251,18 @@ export default function DashboardView({ tab = 'overview', onTab, mimiStatus, aut
                           <span className="text-5xl font-black font-mono text-[#1a1028] tracking-tight" aria-live="off">{fmtLeft(goldenLeft)}</span>
                           <span className="text-sm font-mono text-amber-600 uppercase">left</span>
                         </div>
-                        <p className="text-xs text-zinc-600 mt-2 leading-relaxed">Since you found it ({fmtSince(since)} ago). Seal evidence and send a notice inside the first hour.</p>
+                        <p className="text-xs text-zinc-600 mt-2 leading-relaxed">Since you found it ({fmtSince(since)} ago). Seal evidence and send a notice inside the 2-hour window.</p>
                       </>
                     ) : (
                       <>
                         <div className="text-3xl font-black font-mono text-[#1a1028] tracking-tight">{fmtSince(since)}</div>
-                        <p className="text-xs text-zinc-600 mt-2 leading-relaxed">since you found it. The first hour has passed — it is still worth acting now.</p>
+                        <p className="text-xs text-zinc-600 mt-2 leading-relaxed">since you found it. The 2-hour window has passed — it is still worth acting now.</p>
                       </>
                     )
                   ) : (
                     <>
                       <div className="text-2xl font-extrabold text-[#1a1028]">No active incident</div>
-                      <p className="text-xs text-zinc-600 mt-2 leading-relaxed">Found something just now? Start the clock and Solace tracks the first hour and the platform deadline.</p>
+                      <p className="text-xs text-zinc-600 mt-2 leading-relaxed">Found something just now? Start the clock and Solace tracks the official 2-hour window and platform deadline.</p>
                       <button onClick={startIncident} disabled={incBusy} className="mt-4 px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-700 text-xs font-mono font-bold hover:bg-amber-500/25 transition-colors cursor-pointer disabled:opacity-50">Start clock now</button>
                     </>
                   )}
@@ -316,7 +316,7 @@ export default function DashboardView({ tab = 'overview', onTab, mimiStatus, aut
                       </svg>
                       <div className="absolute inset-x-0 bottom-0 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-zinc-500">
                         {tl.pts.map((p) => <span key={p.key}><span className="text-cyan-600">●</span> {p.label} {new Date(p.t).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>)}
-                        <span><span className="text-amber-600">┆</span> 1st hour ends</span>
+                        <span><span className="text-amber-600">┆</span> 2-hour window ends</span>
                         <span className="text-[#1a1028]">│ now</span>
                       </div>
                     </div>
