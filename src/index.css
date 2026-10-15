@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --gold: #f59e0b;
+  --gold-light: #fcd34d;
+  --page: #f4f0f8;
+  --surface: #fffaff;
+  --accent: #7541b8;
+  --accent-light: #a47ad3;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  background-color: var(--page);
+}
+
+body {
+  background: var(--page);
+  color: #292333;
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Fade-in animation for section elements */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Liquid glass overlay */
+.liquid-glass {
+  background: rgba(255, 250, 255, 0.82);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  border: 1px solid rgba(117, 65, 184, 0.2);
+  box-shadow:
+    0 18px 54px rgba(59, 39, 78, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f4f0f8; }
+::-webkit-scrollbar-thumb { background: #bba4d5; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #8d67b7; }
