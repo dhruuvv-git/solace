@@ -2,7 +2,7 @@
  * Solace account in the extension.
  *
  * Link flow (no password ever typed into the extension):
- *   1. Mimi opens the Solace website at #/connect.
+ *   1. Mimi opens the Solace website at #/signin.
  *   2. The signed-in website asks the API for a one-time link code (2 minutes)
  *      and sends it to Mimi with chrome.runtime.sendMessage (externally_connectable;
  *      only origins in solace.config.json can do this).
@@ -46,11 +46,11 @@ export async function apiBase(): Promise<string> {
   return new URL('api/', site).toString();
 }
 
-/** The website page Mimi opens to sign in and link. */
+/** Open the website's real sign-in form. Static Vercel mode has no account-link API. */
 export async function connectUrl(): Promise<string> {
   const s = await getSettings();
   const site = safeWebsiteUrl(s.websiteUrl) ?? APP.websiteUrl;
-  return new URL('#/connect', site).toString();
+  return new URL('#/signin', site).toString();
 }
 
 export async function dashboardUrl(): Promise<string> {

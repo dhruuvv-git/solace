@@ -60,9 +60,9 @@ export function MimiConnectCard({ status, compact = false, autoLink = false }) {
             {status.state === 'missing' && 'Download the ZIP, then load it on chrome://extensions — the steps are below. It takes about a minute.'}
             {status.state === 'update' && `You have ${status.version}; ${status.latestVersion} is available. Download it, replace the old folder, then press Reload on chrome://extensions.`}
             {status.state === 'unsupported' && 'Everything else in your workspace works here. Install Mimi from a desktop Chromium browser.'}
-            {installed && linkedToMe && <>Signed in as <strong className="text-zinc-800">{user.email}</strong>. Mimi’s settings follow this account.</>}
-            {installed && linkedToOther && <>Mimi is signed in as <strong className="text-zinc-800">{acct.email}</strong>, a different account.</>}
-            {installed && !linkedToMe && !linkedToOther && (acct?.status === 'expired' ? 'Mimi’s session ended. Connect her again to keep your settings in sync.' : 'Mimi works without an account. Connect her to sync her settings with this account.')}
+            {installed && linkedToMe && <>Signed in as <strong className="text-zinc-800">{user.email}</strong>.</>}
+            {installed && linkedToOther && <>Mimi is signed in as <strong className="text-zinc-800">{acct.email}</strong>.</>}
+            {installed && !linkedToMe && !linkedToOther && 'Mimi works without an account. Website account linking is unavailable in this Vercel-only version.'}
           </p>
         </div>
       </div>
@@ -73,10 +73,9 @@ export function MimiConnectCard({ status, compact = false, autoLink = false }) {
             <Download className="w-4 h-4" />{status.state === 'update' ? 'Download update' : 'Download Mimi for Chrome'}
           </a>
         )}
-        {installed && !linkedToMe && (
-          <button onClick={link} disabled={busy} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold font-mono tracking-wider hover:opacity-90 transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_16px_rgba(124,58,237,0.4)] disabled:opacity-60">
-            {busy ? <span className="sol-spinner" /> : <Link2 className="w-4 h-4" />}
-            {busy ? 'Connecting…' : linkedToOther ? 'Switch Mimi to this account' : 'Connect Mimi to this account'}
+        {installed && !linkedToMe && !linkedToOther && (
+          <button onClick={() => { window.location.hash = '/signin'; }} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold font-mono tracking-wider hover:opacity-90 transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_16px_rgba(124,58,237,0.4)]">
+            <Link2 className="w-4 h-4" />Open website sign in
           </button>
         )}
         {installed && (

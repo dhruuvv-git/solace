@@ -148,9 +148,9 @@ export default function AuthModal({ mode = 'signup', onModeChange, onClose, onSu
             </div>
 
             <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10, fontSize: 14, color: '#4b5563', lineHeight: 1.55 }}>
-              <li style={{ display: 'flex', gap: 10 }}><span aria-hidden="true" style={{ color: '#7c3aed', fontWeight: 900 }}>01</span>Same login for this workspace and the Mimi browser extension.</li>
+              <li style={{ display: 'flex', gap: 10 }}><span aria-hidden="true" style={{ color: '#7c3aed', fontWeight: 900 }}>01</span>Your account stays in this browser profile.</li>
               <li style={{ display: 'flex', gap: 10 }}><span aria-hidden="true" style={{ color: '#7c3aed', fontWeight: 900 }}>02</span>Evidence files are fingerprinted in your browser and never uploaded.</li>
-              <li style={{ display: 'flex', gap: 10 }}><span aria-hidden="true" style={{ color: '#7c3aed', fontWeight: 900 }}>03</span>Your password is stored only as a salted scrypt hash.</li>
+              <li style={{ display: 'flex', gap: 10 }}><span aria-hidden="true" style={{ color: '#7c3aed', fontWeight: 900 }}>03</span>Your password is hashed before it is saved on this device.</li>
             </ul>
           </div>
         </form>

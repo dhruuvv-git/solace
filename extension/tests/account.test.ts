@@ -46,7 +46,7 @@ beforeEach(() => {
 describe('account link', () => {
   it('uses the website from solace.config.json as the API base', async () => {
     expect(await acct.apiBase()).toBe('http://localhost:5173/api/');
-    expect(await acct.connectUrl()).toBe('http://localhost:5173/#/connect');
+    expect(await acct.connectUrl()).toBe('http://localhost:5173/#/signin');
   });
 
   it('exchanges a one-time code for a device token and seeds the account with this device’s settings', async () => {

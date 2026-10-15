@@ -64,8 +64,7 @@ export function AccountCard({ compact = false }: { compact?: boolean }) {
         </div>
         {!compact && (
           <p className="small muted">
-            Your {APP.assistant} settings follow your {APP.name} account{state.lastSyncAt ? ` (last synced ${new Date(state.lastSyncAt).toLocaleString()})` : ''}.
-            Evidence, patterns, history and your Groq key stay on this device.
+            Mimi works on this device. The Vercel-only website sign-in is browser-local and does not sync extension settings.
           </p>
         )}
         {error && <p className="notice bad small">{error}</p>}
@@ -86,10 +85,10 @@ export function AccountCard({ compact = false }: { compact?: boolean }) {
       <h3 id="acct-h">{expired ? 'Your session ended' : `Sign in to ${APP.name}`}</h3>
       <p className="small muted">
         {expired
-          ? `${state.user?.email ? `${state.user.email} was signed out` : 'You were signed out'} — from the website, after 30 days, or from another device. Sign in again to keep your settings in sync.`
-          : `Use the same account as the ${APP.name} website. ${APP.assistant}’s checks work without an account; signing in keeps your settings in sync.`}
+          ? `${state.user?.email ? `${state.user.email} was signed out` : 'You were signed out'}. Open website sign-in to continue.`
+          : `${APP.assistant} works without an account. Website sign-in opens the browser-local Solace account page.`}
       </p>
-      <button className="btn primary sm" onClick={() => void openConnect()}>{expired ? 'Sign in again' : `Sign in or create an account`}</button>
+      <button className="btn primary sm" onClick={() => void openConnect()}>{expired ? 'Open website sign-in' : 'Sign in or create an account'}</button>
     </section>
   );
 }

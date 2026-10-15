@@ -83,7 +83,9 @@ function Router() {
   const route = useRoute();
   const auth = useAuth();
   const protectedRoute = ['/dashboard', '/onboarding', '/connect'].includes(route.path);
-  const here = route.path === '/dashboard' && route.sub ? `/dashboard/${route.sub}` : route.path;
+  // Older Mimi builds open /connect. In the serverless site that route can
+  // only take the user to the website's Mimi page; it cannot exchange API codes.
+  const here = route.path === '/connect' ? '/dashboard/mimi' : route.path === '/dashboard' && route.sub ? `/dashboard/${route.sub}` : route.path;
 
   // Guards: signed-out users go to sign-in (and come back afterwards); signed-in users skip the auth modal.
   useEffect(() => {
@@ -106,7 +108,7 @@ function Router() {
   if (protectedRoute && auth.status !== 'signedIn') return <Loading label="Taking you to sign in" />;
 
   if (route.path === '/onboarding') return <OnboardingView next={route.query.next} />;
-  if (route.path === '/connect') return auth.user.onboarding?.completed ? <Workspace tab="mimi" autoLink /> : <Loading />;
+  if (route.path === '/connect') return auth.user.onboarding?.completed ? <Workspace tab="mimi" autoLink={false} /> : <Loading />;
   if (route.path === '/dashboard') {
     if (!auth.user.onboarding?.completed) return <Loading />;
     const tab = DASH_TABS.includes(route.sub) ? route.sub : 'overview';
