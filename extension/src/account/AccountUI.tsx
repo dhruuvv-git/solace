@@ -64,7 +64,7 @@ export function AccountCard({ compact = false }: { compact?: boolean }) {
         </div>
         {!compact && (
           <p className="small muted">
-            Mimi works on this device. The Vercel-only website sign-in is browser-local and does not sync extension settings.
+            Mimi works on this device. {state.localOnly ? 'Your website sign-in is mirrored locally in this browser; extension settings do not sync.' : 'Extension settings sync is unavailable in this Vercel-only website version.'}
           </p>
         )}
         {error && <p className="notice bad small">{error}</p>}

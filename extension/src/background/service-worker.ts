@@ -18,7 +18,7 @@ import {
   type FetchImageReply, type PanelJob, type SelectionContextReply, type SourceInfo,
 } from '../shared/messaging';
 import { getSettings, onSettingsChanged } from '../shared/settings';
-import { getAccount, linkWithCode, pushSettingsIfChanged, unlinkFromWebsite, AccountError } from '../account/account';
+import { getAccount, linkWithCode, pushSettingsIfChanged, unlinkFromWebsite, setWebsiteAccount, AccountError } from '../account/account';
 import { APP } from '../shared/app-config';
 
 const MAX_IMAGE = 7 * 1024 * 1024;
@@ -258,6 +258,14 @@ chrome.runtime.onMessageExternal.addListener((raw, sender, sendResponse) => {
   }
   if (msg.type === 'TL_UNLINK') {
     unlinkFromWebsite(msg.userId).then((removed) => sendResponse({ ok: true, removed }));
+    return true;
+  }
+  if (msg.type === 'TL_LOCAL_ACCOUNT') {
+    setWebsiteAccount(msg.user).then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (msg.type === 'TL_LOCAL_SIGNOUT') {
+    setWebsiteAccount(null).then(() => sendResponse({ ok: true }));
     return true;
   }
   const windowId = sender.tab?.windowId;

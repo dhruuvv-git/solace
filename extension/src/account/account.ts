@@ -21,13 +21,14 @@ import { getSettings, kvGet, kvRemove, kvSet, saveSettings, type Settings } from
 
 export interface AccountUser { id: string; name: string; email: string }
 export type AccountStatus = 'signed-out' | 'signed-in' | 'expired';
-export interface AccountState { status: AccountStatus; user?: AccountUser; linkedAt?: number; expiresAt?: number; lastSyncAt?: number }
+export interface AccountState { status: AccountStatus; user?: AccountUser; linkedAt?: number; expiresAt?: number; lastSyncAt?: number; localOnly?: boolean }
 
 interface StoredAccount { token: string; user: AccountUser; linkedAt: number; expiresAt: number; lastSyncAt?: number }
 interface ExpiredAccount { user: AccountUser; at: number }
 
 const KEY = 'account';
 const EXPIRED_KEY = 'accountExpired';
+const WEBSITE_ACCOUNT_KEY = 'websiteAccount';
 const SNAPSHOT_KEY = 'accountSyncSnapshot';
 
 export const SYNC_KEYS = [
@@ -90,6 +91,8 @@ export async function getAccount(): Promise<AccountState> {
     if (a.expiresAt <= Date.now()) { await markExpired(a.user); return { status: 'expired', user: a.user }; }
     return { status: 'signed-in', user: a.user, linkedAt: a.linkedAt, expiresAt: a.expiresAt, lastSyncAt: a.lastSyncAt };
   }
+  const websiteUser = await kvGet<AccountUser | null>(WEBSITE_ACCOUNT_KEY, null);
+  if (websiteUser?.id && websiteUser.email) return { status: 'signed-in', user: websiteUser, localOnly: true };
   const e = await kvGet<ExpiredAccount | null>(EXPIRED_KEY, null);
   return e?.user ? { status: 'expired', user: e.user } : { status: 'signed-out' };
 }
@@ -176,22 +179,38 @@ export async function signOutAccount(): Promise<void> {
   await kvRemove(KEY);
   await kvRemove(SNAPSHOT_KEY);
   await kvRemove(EXPIRED_KEY);
+  await kvRemove(WEBSITE_ACCOUNT_KEY);
 }
 
 /** Website signed out: forget the link if it belongs to that user (the server already revoked it). */
 export async function unlinkFromWebsite(userId: string | undefined): Promise<boolean> {
   const a = await readStored();
-  if (!a || (userId && a.user.id !== userId)) return false;
-  await kvRemove(KEY);
-  await kvRemove(SNAPSHOT_KEY);
-  await kvRemove(EXPIRED_KEY);
-  return true;
+  const websiteUser = await kvGet<AccountUser | null>(WEBSITE_ACCOUNT_KEY, null);
+  let removed = false;
+  if (websiteUser && (!userId || websiteUser.id === userId)) { await kvRemove(WEBSITE_ACCOUNT_KEY); removed = true; }
+  if (a && (!userId || a.user.id === userId)) {
+    await kvRemove(KEY);
+    await kvRemove(SNAPSHOT_KEY);
+    await kvRemove(EXPIRED_KEY);
+    removed = true;
+  }
+  return removed;
+}
+
+/** Stores the website's local account identity only; it does not enable cloud settings sync. */
+export async function setWebsiteAccount(user: AccountUser | null): Promise<void> {
+  if (user) {
+    await kvSet<AccountUser>(WEBSITE_ACCOUNT_KEY, user);
+    await kvRemove(EXPIRED_KEY);
+  } else {
+    await kvRemove(WEBSITE_ACCOUNT_KEY);
+  }
 }
 
 export function onAccountChanged(cb: () => void): () => void {
   if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return () => {};
   const l = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-    if (area === 'local' && (KEY in changes || EXPIRED_KEY in changes)) cb();
+    if (area === 'local' && (KEY in changes || EXPIRED_KEY in changes || WEBSITE_ACCOUNT_KEY in changes)) cb();
   };
   chrome.storage.onChanged.addListener(l);
   return () => chrome.storage.onChanged.removeListener(l);

@@ -110,7 +110,10 @@ export type FromWebsite =
   /** Signed-in website hands Mimi a one-time code to link the same Solace account. */
   | { type: 'TL_LINK'; code: string }
   /** Website signed out: Mimi forgets the link if it belongs to this user. */
-  | { type: 'TL_UNLINK'; userId?: string };
+  | { type: 'TL_UNLINK'; userId?: string }
+  /** Mirror the website's browser-local account identity into this extension profile. */
+  | { type: 'TL_LOCAL_ACCOUNT'; user: { id: string; name: string; email: string } }
+  | { type: 'TL_LOCAL_SIGNOUT' };
 
 const WEB_VIEWS = ['overview', 'real', 'kind', 'identity', 'safety', 'locker', 'game', 'settings'];
 
@@ -121,6 +124,12 @@ export function validateFromWebsite(m: unknown): FromWebsite | null {
   if (o.type === 'TL_OPEN') return o.view === undefined || (typeof o.view === 'string' && WEB_VIEWS.includes(o.view)) ? (o as FromWebsite) : null;
   if (o.type === 'TL_LINK') return typeof o.code === 'string' && /^[A-Za-z0-9_-]{20,100}$/.test(o.code) ? { type: 'TL_LINK', code: o.code } : null;
   if (o.type === 'TL_UNLINK') return o.userId === undefined || (typeof o.userId === 'string' && o.userId.length <= 64) ? { type: 'TL_UNLINK', ...(typeof o.userId === 'string' ? { userId: o.userId } : {}) } : null;
+  if (o.type === 'TL_LOCAL_ACCOUNT') {
+    const u = o.user as Record<string, unknown> | undefined;
+    return u && typeof u.id === 'string' && u.id.length > 0 && u.id.length <= 64 && typeof u.name === 'string' && u.name.trim().length > 0 && u.name.length <= 120 && typeof u.email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u.email) && u.email.length <= 254
+      ? { type: 'TL_LOCAL_ACCOUNT', user: { id: u.id, name: u.name.trim(), email: u.email.trim().toLowerCase() } } : null;
+  }
+  if (o.type === 'TL_LOCAL_SIGNOUT') return { type: 'TL_LOCAL_SIGNOUT' };
   if (o.type === 'TL_CHECK') return ['misinfo', 'kind', 'safety'].includes(o.mode as string) && typeof o.text === 'string' && o.text.trim().length > 0 && o.text.length <= LIMITS.text ? (o as FromWebsite) : null;
   return null;
 }

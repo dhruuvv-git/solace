@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Download, ExternalLink, Link2, Puzzle, RefreshCw, Send, ShieldCheck, Smartphone, Unlink } from 'lucide-react';
-import { Api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { DOWNLOAD_URL, Mimi } from '../lib/mimi';
 import { useToast } from './Toaster';
@@ -31,10 +30,9 @@ export function MimiConnectCard({ status, compact = false, autoLink = false }) {
   const link = async () => {
     setBusy(true); setMsg(null);
     try {
-      const { code } = await Api.linkCode();
-      const r = await Mimi.link(code);
-      if (!r?.ok) throw new Error(r?.error || (r?.reason === 'timeout' ? 'Mimi did not answer. Reload this page and try again.' : 'Mimi is not reachable. Reload this page after installing.'));
-      toast(`Mimi is signed in as ${user.email}.`);
+      const r = await Mimi.localAccount(user);
+      if (!r?.ok) throw new Error('Mimi is not reachable. Reload this page after installing the extension.');
+      toast(`Mimi is signed in as ${user.email} on this browser.`);
       await status.refresh();
     } catch (e) {
       setMsg({ tone: 'error', text: e.message });
@@ -57,7 +55,7 @@ export function MimiConnectCard({ status, compact = false, autoLink = false }) {
           <span className={`text-[11px] font-mono tracking-widest ${copy.tone}`}>{copy.kicker}{installed && status.version ? ` · v${status.version}` : ''}</span>
           <h3 className="text-xl font-bold text-[#1a1028] mt-1">{copy.title}</h3>
           <p className="text-sm text-zinc-600 mt-1 leading-relaxed">
-            {status.state === 'missing' && 'Download the ZIP, then load it on chrome://extensions — the steps are below. It takes about a minute.'}
+            {status.state === 'missing' && 'A downloaded ZIP is not installed yet. Extract it, choose Load unpacked on chrome://extensions, then reload this page so Mimi can be detected.'}
             {status.state === 'update' && `You have ${status.version}; ${status.latestVersion} is available. Download it, replace the old folder, then press Reload on chrome://extensions.`}
             {status.state === 'unsupported' && 'Everything else in your workspace works here. Install Mimi from a desktop Chromium browser.'}
             {installed && linkedToMe && <>Signed in as <strong className="text-zinc-800">{user.email}</strong>.</>}
@@ -68,22 +66,18 @@ export function MimiConnectCard({ status, compact = false, autoLink = false }) {
       </div>
 
       <div className="relative flex flex-wrap gap-3 mt-5">
-        {(status.state === 'missing' || status.state === 'update') && (
-          <a href={DOWNLOAD_URL} download className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold font-mono tracking-wider hover:opacity-90 transition-all flex items-center gap-2 shadow-[0_0_16px_rgba(124,58,237,0.4)]">
-            <Download className="w-4 h-4" />{status.state === 'update' ? 'Download update' : 'Download Mimi for Chrome'}
-          </a>
-        )}
+        <a href={DOWNLOAD_URL} download className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold font-mono tracking-wider hover:opacity-90 transition-all flex items-center gap-2 shadow-[0_0_16px_rgba(124,58,237,0.4)]">
+          <Download className="w-4 h-4" />{status.state === 'update' ? 'Download update' : 'Download Mimi'}
+        </a>
         {installed && !linkedToMe && !linkedToOther && (
-          <button onClick={() => { window.location.hash = '/signin'; }} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold font-mono tracking-wider hover:opacity-90 transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_16px_rgba(124,58,237,0.4)]">
-            <Link2 className="w-4 h-4" />Open website sign in
+          <button onClick={link} disabled={busy} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold font-mono tracking-wider hover:opacity-90 transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_16px_rgba(124,58,237,0.4)] disabled:opacity-50">
+            <Link2 className="w-4 h-4" />{busy ? 'Syncing sign-in…' : 'Sync website sign-in'}
           </button>
         )}
-        {installed && (
-          <button onClick={async () => { const r = await Mimi.open(); if (!r?.ok) setMsg({ tone: 'error', text: 'Mimi did not respond. Reload this page and try again.' }); else if (!r.opened) setMsg({ tone: 'info', text: r.hint }); }}
-            className="px-4 py-2.5 rounded-xl bg-violet-50 hover:bg-violet-100 text-zinc-800 text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer border border-violet-100">
-            <ExternalLink className="w-4 h-4" />Open Mimi
-          </button>
-        )}
+        <button disabled={!installed} title={!installed ? 'Install Mimi to open it from this page.' : 'Open Mimi'} onClick={async () => { const r = await Mimi.open(); if (!r?.ok) setMsg({ tone: 'error', text: 'Mimi did not respond. Reload this page and try again.' }); else if (!r.opened) setMsg({ tone: 'info', text: r.hint }); }}
+          className="px-4 py-2.5 rounded-xl bg-violet-50 hover:bg-violet-100 text-zinc-800 text-xs font-mono flex items-center gap-2 transition-colors border border-violet-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
+          <ExternalLink className="w-4 h-4" />Open Mimi
+        </button>
         {!compact && (
           <button onClick={() => status.refresh()} className="px-4 py-2.5 rounded-xl text-zinc-600 hover:text-[#5b21b6] text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer">
             <RefreshCw className="w-4 h-4" />Check again

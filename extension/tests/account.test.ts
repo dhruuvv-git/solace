@@ -45,8 +45,8 @@ beforeEach(() => {
 
 describe('account link', () => {
   it('uses the website from solace.config.json as the API base', async () => {
-    expect(await acct.apiBase()).toBe('http://localhost:5173/api/');
-    expect(await acct.connectUrl()).toBe('http://localhost:5173/#/signin');
+    expect(await acct.apiBase()).toBe('https://solacee-nine.vercel.app/api/');
+    expect(await acct.connectUrl()).toBe('https://solacee-nine.vercel.app/#/signin');
   });
 
   it('exchanges a one-time code for a device token and seeds the account with this device’s settings', async () => {
@@ -123,6 +123,14 @@ describe('expiry and sign-out', () => {
     expect(await acct.unlinkFromWebsite('u1')).toBe(true);
     expect((await acct.getAccount()).status).toBe('signed-out');
   });
+
+  it('mirrors a local website sign-in into Mimi without enabling API sync', async () => {
+    await acct.setWebsiteAccount({ id: 'web1', name: 'Dhruv', email: 'dhruv@example.com' });
+    expect(await acct.getAccount()).toMatchObject({ status: 'signed-in', localOnly: true, user: { id: 'web1', email: 'dhruv@example.com' } });
+    expect(calls).toHaveLength(0);
+    await acct.setWebsiteAccount(null);
+    expect((await acct.getAccount()).status).toBe('signed-out');
+  });
 });
 
 describe('website messages', () => {
@@ -132,5 +140,8 @@ describe('website messages', () => {
     expect(validateFromWebsite({ type: 'TL_LINK', code: '<script>alert(1)</script>aaaaaaaaaa' })).toBeNull();
     expect(validateFromWebsite({ type: 'TL_UNLINK', userId: 'u1' })).toEqual({ type: 'TL_UNLINK', userId: 'u1' });
     expect(validateFromWebsite({ type: 'TL_UNLINK', userId: 5 })).toBeNull();
+    expect(validateFromWebsite({ type: 'TL_LOCAL_ACCOUNT', user: { id: 'u1', name: 'Asha', email: 'asha@example.com' } })).toMatchObject({ type: 'TL_LOCAL_ACCOUNT', user: { email: 'asha@example.com' } });
+    expect(validateFromWebsite({ type: 'TL_LOCAL_ACCOUNT', user: { id: 'u1', name: 'Asha', email: 'bad' } })).toBeNull();
+    expect(validateFromWebsite({ type: 'TL_LOCAL_SIGNOUT' })).toEqual({ type: 'TL_LOCAL_SIGNOUT' });
   });
 });

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Api } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { Mimi } from '../lib/mimi';
 import { navigate } from '../lib/router';
 import { deleteRecord, exportJson, formatSize, istStamp, listRecords, sealFile, verifyFile } from '../lib/vault';
 import { CONCERNS } from '../lib/concerns';
@@ -137,7 +138,7 @@ export default function DashboardView({ tab = 'overview', onTab, mimiStatus, aut
   ];
   const mimiInstalled = mimiStatus.state === 'installed' || mimiStatus.state === 'update';
   const mimiLinked = mimiInstalled && mimiStatus.account?.status === 'signed-in' && mimiStatus.account.userId === user.id;
-  const mimiLabel = mimiStatus.state === 'checking' ? 'Checking for Mimi…' : mimiLinked ? 'Mimi connected' : mimiInstalled ? 'Mimi installed · connect' : 'Get Mimi extension';
+  const mimiLabel = mimiStatus.state === 'checking' ? 'Checking for Mimi…' : mimiInstalled ? 'Open Mimi' : 'Get Mimi extension';
 
   // timeline: discovery → (seal) → (notice) → 2-hour deadline
   const tl = useMemo(() => {
@@ -227,9 +228,9 @@ export default function DashboardView({ tab = 'overview', onTab, mimiStatus, aut
               Signed in as {user.email} · Media hashed locally in your browser · Nothing uploaded
             </p>
           </div>
-          <button onClick={() => go('mimi')} onMouseEnter={() => setMimiHovered(true)} onMouseLeave={() => setMimiHovered(false)} onFocus={() => setMimiHovered(true)} onBlur={() => setMimiHovered(false)} aria-label={mimiLabel} title={mimiLabel} className={`group px-2 py-1.5 min-h-11 rounded-full text-xs font-mono flex items-center gap-2 cursor-pointer border self-start sm:self-auto transition-all duration-200 ${mimiLinked ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : mimiInstalled ? 'bg-amber-500/10 border-amber-500/25 text-amber-700' : 'bg-violet-50 border-violet-200 text-zinc-700'}`} data-testid="mimi-pill">
+          <button onClick={async () => { if (mimiInstalled) { const r = await Mimi.open(); if (!r?.ok) go('mimi'); } else go('mimi'); }} onMouseEnter={() => setMimiHovered(true)} onMouseLeave={() => setMimiHovered(false)} onFocus={() => setMimiHovered(true)} onBlur={() => setMimiHovered(false)} aria-label={mimiLabel} title={mimiLabel} className={`group px-2 py-1.5 min-h-11 rounded-full text-xs font-mono flex items-center gap-2 cursor-pointer border self-start sm:self-auto transition-all duration-300 ${mimiLinked ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : mimiInstalled ? 'bg-amber-500/10 border-amber-500/25 text-amber-700' : 'bg-violet-50 border-violet-200 text-zinc-700'}`} data-testid="mimi-pill">
             <img src={mimiHovered ? '/robot-jump.gif' : '/solace-robot.png'} alt="" aria-hidden="true" className="w-9 h-9 shrink-0 object-contain" />
-            <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover:max-w-56 group-hover:opacity-100 group-focus-visible:max-w-56 group-focus-visible:opacity-100">{mimiLabel}</span>
+            <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-500 delay-100 group-hover:max-w-56 group-hover:opacity-100 group-focus-visible:max-w-56 group-focus-visible:opacity-100">{mimiLabel}</span>
           </button>
         </div>
 

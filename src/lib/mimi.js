@@ -64,6 +64,7 @@ export const Mimi = {
   check: (mode, text) => send({ type: 'TL_CHECK', mode, text: String(text || '').slice(0, 20000) }),
   link: (code) => send({ type: 'TL_LINK', code }, 15000),
   unlink: (userId) => send(userId ? { type: 'TL_UNLINK', userId } : { type: 'TL_UNLINK' }),
+  localAccount: (user) => send(user ? { type: 'TL_LOCAL_ACCOUNT', user } : { type: 'TL_LOCAL_SIGNOUT' }),
 };
 
 /** Live extension status; re-checks when the window regains focus (e.g. after installing). */

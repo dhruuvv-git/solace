@@ -9,7 +9,7 @@ import OnboardingView from './components/OnboardingView';
 import { ToastProvider, useToast } from './components/Toaster';
 import { AuthProvider, useAuth } from './lib/auth';
 import { navigate, safeNext, useRoute } from './lib/router';
-import { useMimiStatus } from './lib/mimi';
+import { Mimi, useMimiStatus } from './lib/mimi';
 import './index.css';
 
 const DASH_TABS = ['overview', 'vault', 'deadlines', 'report', 'crisis', 'mimi', 'account'];
@@ -86,6 +86,19 @@ function Router() {
   // Older Mimi builds open /connect. In the serverless site that route can
   // only take the user to the website's Mimi page; it cannot exchange API codes.
   const here = route.path === '/connect' ? '/dashboard/mimi' : route.path === '/dashboard' && route.sub ? `/dashboard/${route.sub}` : route.path;
+
+  // The Vercel site keeps accounts in this browser. Mirror only the account
+  // identity to Mimi in the same Chrome profile; credentials never leave the site.
+  useEffect(() => {
+    if (auth.status !== 'signedIn') return;
+    const sync = () => Mimi.localAccount(auth.user).catch(() => {});
+    sync();
+    window.addEventListener('focus', sync);
+    return () => window.removeEventListener('focus', sync);
+  }, [auth.status, auth.user]);
+  useEffect(() => {
+    if (auth.status === 'signedOut') Mimi.localAccount(null).catch(() => {});
+  }, [auth.status]);
 
   // Guards: signed-out users go to sign-in (and come back afterwards); signed-in users skip the auth modal.
   useEffect(() => {
