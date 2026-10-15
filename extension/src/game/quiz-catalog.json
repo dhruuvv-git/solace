@@ -1,0 +1,122 @@
+[
+  {
+    "id": "scene1-original",
+    "src": "samples/scene1-original.jpg",
+    "label": "real",
+    "title": "Scene 1",
+    "cue": "Consistent light and grain",
+    "explanation": "Unedited render: shadows fall away from the single sun and the fine grain is the same everywhere.",
+    "provenance": "Procedurally drawn by the Solace asset script (scripts/gen-assets.ts). No third-party images. Free to redistribute with Solace.",
+    "initialRating": 1150
+  },
+  {
+    "id": "scene1-edited",
+    "src": "samples/scene1-edited.jpg",
+    "label": "fake",
+    "title": "Cloned tree",
+    "cue": "An identical copy of an object",
+    "explanation": "The middle tree is a pixel-for-pixel copy of the left tree (copy-move forgery). Real trees are never identical.",
+    "provenance": "Procedurally drawn by the Solace asset script (scripts/gen-assets.ts). No third-party images. Free to redistribute with Solace.",
+    "initialRating": 1150
+  },
+  {
+    "id": "scene2-original",
+    "src": "samples/scene2-original.jpg",
+    "label": "real",
+    "title": "Scene 2",
+    "cue": "Consistent light and grain",
+    "explanation": "Unedited render: shadows fall away from the single sun and the fine grain is the same everywhere.",
+    "provenance": "Procedurally drawn by the Solace asset script (scripts/gen-assets.ts). No third-party images. Free to redistribute with Solace.",
+    "initialRating": 1170
+  },
+  {
+    "id": "scene2-edited",
+    "src": "samples/scene2-edited.jpg",
+    "label": "fake",
+    "title": "Two suns",
+    "cue": "Impossible lighting",
+    "explanation": "A second sun was painted in, but the shadows only match the first one. Inconsistent light sources are a classic manipulation clue.",
+    "provenance": "Procedurally drawn by the Solace asset script (scripts/gen-assets.ts). No third-party images. Free to redistribute with Solace.",
+    "initialRating": 1100
+  },
+  {
+    "id": "scene3-original",
+    "src": "samples/scene3-original.jpg",
+    "label": "real",
+    "title": "Scene 3",
+    "cue": "Consistent light and grain",
+    "explanation": "Unedited render: shadows fall away from the single sun and the fine grain is the same everywhere.",
+    "provenance": "Procedurally drawn by the Solace asset script (scripts/gen-assets.ts). No third-party images. Free to redistribute with Solace.",
+    "initialRating": 1190
+  },
+  {
+    "id": "scene3-edited",
+    "src": "samples/scene3-edited.jpg",
+    "label": "fake",
+    "title": "Pasted region",
+    "cue": "A blocky patch with different grain",
+    "explanation": "A region from a different, heavily compressed image was pasted in. Look for blockier texture and a sharp seam around the patch.",
+    "provenance": "Procedurally drawn by the Solace asset script (scripts/gen-assets.ts). No third-party images. Free to redistribute with Solace.",
+    "initialRating": 1300
+  },
+  {
+    "id": "scene4-original",
+    "src": "samples/scene4-original.jpg",
+    "label": "real",
+    "title": "Scene 4",
+    "cue": "Consistent light and grain",
+    "explanation": "Unedited render: shadows fall away from the single sun and the fine grain is the same everywhere.",
+    "provenance": "Procedurally drawn by the Solace asset script (scripts/gen-assets.ts). No third-party images. Free to redistribute with Solace.",
+    "initialRating": 1210
+  },
+  {
+    "id": "scene4-edited",
+    "src": "samples/scene4-edited.jpg",
+    "label": "fake",
+    "title": "Over-smoothed area",
+    "cue": "Waxy, grain-free region",
+    "explanation": "One large area was heavily smoothed, removing the natural grain — similar to AI in-painting or beauty filters.",
+    "provenance": "Procedurally drawn by the Solace asset script (scripts/gen-assets.ts). No third-party images. Free to redistribute with Solace.",
+    "initialRating": 1350
+  },
+  {
+    "id": "scene5-original",
+    "src": "samples/scene5-original.jpg",
+    "label": "real",
+    "title": "Scene 5",
+    "cue": "Consistent light and grain",
+    "explanation": "Unedited render: shadows fall away from the single sun and the fine grain is the same everywhere.",
+    "provenance": "Procedurally drawn by the Solace asset script (scripts/gen-assets.ts). No third-party images. Free to redistribute with Solace.",
+    "initialRating": 1230
+  },
+  {
+    "id": "scene5-edited",
+    "src": "samples/scene5-edited.jpg",
+    "label": "fake",
+    "title": "Wrong shadow",
+    "cue": "Shadow points toward the light",
+    "explanation": "The added right-hand tree casts its shadow toward the sun, opposite to every other shadow in the scene.",
+    "provenance": "Procedurally drawn by the Solace asset script (scripts/gen-assets.ts). No third-party images. Free to redistribute with Solace.",
+    "initialRating": 1250
+  },
+  {
+    "id": "scene6-original",
+    "src": "samples/scene6-original.jpg",
+    "label": "real",
+    "title": "Scene 6",
+    "cue": "Consistent light and grain",
+    "explanation": "Unedited render: shadows fall away from the single sun and the fine grain is the same everywhere.",
+    "provenance": "Procedurally drawn by the Solace asset script (scripts/gen-assets.ts). No third-party images. Free to redistribute with Solace.",
+    "initialRating": 1250
+  },
+  {
+    "id": "scene6-edited",
+    "src": "samples/scene6-edited.jpg",
+    "label": "fake",
+    "title": "Stamped clouds",
+    "cue": "Repeating pattern",
+    "explanation": "The same cloud was stamped three times in a row. Repeated identical textures are a sign of cloning.",
+    "provenance": "Procedurally drawn by the Solace asset script (scripts/gen-assets.ts). No third-party images. Free to redistribute with Solace.",
+    "initialRating": 1200
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "description": "Bundled DEMONSTRATION dataset: dHashes of Solace sample images that were deliberately manipulated for this project. Not a database of real-world debunked images.",
+  "entries": [
+    {
+      "id": "debunked-demo-1",
+      "label": "Solace demo “debunked” image: night sky with two moons",
+      "hash": "55534b4d710293b6",
+      "note": "Fictional example created by Solace to demonstrate known-fake matching."
+    },
+    {
+      "id": "debunked-demo-2",
+      "label": "Solace demo “debunked” image: desert with cloned trees",
+      "hash": "3515986afaec555b",
+      "note": "Fictional example created by Solace to demonstrate known-fake matching."
+    },
+    {
+      "id": "debunked-demo-3",
+      "label": "Solace demo “debunked” image: orchard with pasted house",
+      "hash": "2d5546c8daea2964",
+      "note": "Fictional example created by Solace to demonstrate known-fake matching."
+    }
+  ]
+}

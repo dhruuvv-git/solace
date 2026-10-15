@@ -1,13 +1,21 @@
 {
-  "name": "goldenhour",
+  "name": "solace",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite",
+    "dev:api": "node --watch-path=server server/index.mjs",
     "build": "vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "start": "node server/index.mjs --production",
+    "lint": "oxlint src server scripts",
+    "test": "npm run test:api && npm run test:web",
+    "test:api": "node --test server/app.test.mjs",
+    "test:web": "node scripts/e2e-journey.mjs",
+    "extension:install": "npm --prefix extension install",
+    "extension:build": "npm --prefix extension run package && node scripts/copy-extension.mjs",
+    "extension:test": "npm --prefix extension test"
   },
   "dependencies": {
     "@radix-ui/react-icons": "^1.3.2",

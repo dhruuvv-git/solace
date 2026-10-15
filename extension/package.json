@@ -1,0 +1,45 @@
+{
+  "name": "solace-mimi",
+  "version": "2.0.0",
+  "description": "Solace: privacy-first Chrome extension for digital safety",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev:panel": "vite",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "assets": "esbuild scripts/gen-assets.ts --bundle --platform=node --format=cjs --outfile=scripts/.gen-assets.cjs --log-level=warning && node scripts/.gen-assets.cjs && node -e \"require('fs').rmSync('scripts/.gen-assets.cjs')\"",
+    "package": "npm run build && node scripts/zip.mjs dist solace-extension.zip",
+    "test:browser": "node scripts/e2e-browser.mjs",
+    "test:content": "node scripts/e2e-content.mjs"
+  },
+  "author": "Solace team",
+  "license": "MIT",
+  "dependencies": {
+    "@fontsource/atkinson-hyperlegible": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/noto-sans-devanagari": "^5.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.5",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "esbuild": "^0.28.2",
+    "fake-indexeddb": "^6.2.5",
+    "jpeg-js": "^0.4.4",
+    "jsdom": "^29.1.1",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^25.14.0",
+    "typescript": "5.8",
+    "vite": "^6.4.4",
+    "vitest": "^3.2.7"
+  },
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  }
+}

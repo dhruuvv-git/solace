@@ -5,6 +5,7 @@ export default function NotAloneSection() {
   return (
     <section
       id="not-alone"
+      className="sol-section"
       style={{
         minHeight: '100vh',
         display: 'flex',
@@ -14,7 +15,7 @@ export default function NotAloneSection() {
       }}
     >
       <div style={{ maxWidth: 1400, margin: '0 auto', width: '100%' }}>
-        <div style={{
+        <div className="sol-grid-2" style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gap: 96,
@@ -96,7 +97,7 @@ export default function NotAloneSection() {
           {/* Right: Visual placeholder (DriftWall will go here) */}
           <div>
             <FadeUp delay={100}>
-              <div style={{
+              <div className="sol-drift" style={{
                 height: 600,
                 borderRadius: 32,
                 background: 'linear-gradient(135deg, #f5f0ff 0%, #ede9fe 50%, #f0f9ff 100%)',

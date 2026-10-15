@@ -1,0 +1,5 @@
+node_modules
+dist
+dist-landing
+*.zip
+scripts/.gen-assets.cjs

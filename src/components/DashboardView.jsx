@@ -1,241 +1,277 @@
-import { useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  LayoutDashboard,
-  ShieldCheck,
-  Clock,
-  FileText,
-  PhoneCall,
-  CheckCircle2,
-  AlertTriangle,
-  ArrowRight,
-  Lock,
-  Download,
-  Copy,
-  Check,
-  LogOut,
-  Flame,
-  Sparkles,
-  Activity,
-  FileCheck,
-  ExternalLink,
-  ChevronRight
+  LayoutDashboard, ShieldCheck, Clock, FileText, PhoneCall, ArrowRight, Lock, Copy, Check, LogOut, Flame,
+  Sparkles, FileCheck, ExternalLink, Puzzle, UserRound, Menu, X, Trash2, Download, BadgeCheck, TimerReset, Send,
 } from 'lucide-react';
+import { Api } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import { navigate } from '../lib/router';
+import { deleteRecord, exportJson, formatSize, istStamp, listRecords, sealFile, verifyFile } from '../lib/vault';
+import { CONCERNS } from '../lib/concerns';
+import MimiPanel from './MimiPanel';
+import AccountPanel from './AccountPanel';
+import ReportBuilder from './ReportBuilder';
+import { useToast } from './Toaster';
 
-export default function DashboardView({ user = { name: 'Survivor' }, onLogout }) {
-  const [currentTab, setCurrentTab] = useState('overview');
+const HOUR = 3600000;
+const GOLDEN_MS = HOUR;
+const NCII_MS = 2 * HOUR; // IT Rules 3(2)(b) as amended in 2026
+const SOURCES = [
+  ['IT Rules 2026 explained (iPleaders)', 'https://blog.ipleaders.in/it-rules-2026/'],
+  ['MeitY’s 2-hour deepfake window (Bhatt & Joshi Associates)', 'https://bhattandjoshiassociates.com/meitys-2-hour-deepfake-takedown-window-under-it-amendment-rules-2026-constitutionally-proportionate-or-operationally-impossible/'],
+];
 
-  // Vault state
-  const [sealedFiles, setSealedFiles] = useState([
-    {
-      id: 'hash-001',
-      name: 'screenshot_leak_telegram_raw.png',
-      size: '2.4 MB',
-      hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-      timestamp: '2026-10-15 12:44:18 IST',
-      status: 'Cryptographically Sealed'
-    },
-    {
-      id: 'hash-002',
-      name: 'voice_note_extortion_attempt.m4a',
-      size: '1.1 MB',
-      hash: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
-      timestamp: '2026-10-15 12:49:03 IST',
-      status: 'Cryptographically Sealed'
-    }
-  ]);
-  const [hashingFile, setHashingFile] = useState(false);
-  const fileInputRef = useRef(null);
+const card = 'p-6 rounded-2xl bg-white border border-violet-100 shadow-lg';
 
-  // Notice template copy state
+function useNow(intervalMs = 1000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), intervalMs); return () => clearInterval(t); }, [intervalMs]);
+  return now;
+}
+
+const fmtLeft = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
+};
+const fmtSince = (ms) => {
+  const m = Math.floor(ms / 60000);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  return h < 48 ? `${h} h ${m % 60} min` : `${Math.floor(h / 24)} days`;
+};
+const concernLabel = (id) => CONCERNS.find((c) => c.id === id)?.title ?? 'Incident';
+
+export default function DashboardView({ tab = 'overview', onTab, mimiStatus, autoLink }) {
+  const { user, setUser, signOut } = useAuth();
+  const toast = useToast();
+  const now = useNow();
+  const [drawer, setDrawer] = useState(false);
+  const [records, setRecords] = useState([]);
+  const [vaultLoaded, setVaultLoaded] = useState(false);
+  const [hashing, setHashing] = useState(0);
   const [copiedId, setCopiedId] = useState(null);
+  const [verifyFor, setVerifyFor] = useState(null);
+  const [verifyResult, setVerifyResult] = useState({});
+  const [incBusy, setIncBusy] = useState(false);
+  const fileInputRef = useRef(null);
+  const verifyInputRef = useRef(null);
+  const incident = user?.incident ?? null;
 
-  // Compute local SHA-256 using client Web Crypto API
+  const loadVault = useCallback(async () => {
+    try { setRecords(await listRecords(user.id)); } catch { setRecords([]); } finally { setVaultLoaded(true); }
+  }, [user.id]);
+  useEffect(() => { loadVault(); }, [loadVault]);
+
+  const go = (t) => { onTab?.(t); setDrawer(false); };
+  const handleLogout = async () => { await signOut(); toast('Signed out.'); navigate('/', { replace: true }); };
+
+  const updateIncident = async (patch, msg) => {
+    setIncBusy(true);
+    try { const r = await Api.incident(patch); setUser(r.user); if (msg) toast(msg); }
+    catch (e) { toast(e.message, 'bad'); }
+    finally { setIncBusy(false); }
+  };
+  const startIncident = () => updateIncident({ type: user.onboarding?.concern && user.onboarding.concern !== 'exploring' ? user.onboarding.concern : 'harassment', discoveredAt: Date.now(), noticeSentAt: null }, 'Golden-hour clock started.');
+  const markNoticeSent = () => updateIncident(incident ? { noticeSentAt: Date.now() } : { type: 'intimate-images', discoveredAt: Date.now(), noticeSentAt: Date.now() }, 'Notice time recorded — the 2-hour platform clock is running.');
+
   const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setHashingFile(true);
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setHashing(files.length);
     try {
-      const buffer = await file.arrayBuffer();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-      const newEntry = {
-        id: `hash-${Date.now()}`,
-        name: file.name,
-        size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-        hash: hashHex,
-        timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST',
-        status: 'Cryptographically Sealed'
-      };
-
-      setSealedFiles(prev => [newEntry, ...prev]);
+      for (const f of files) { await sealFile(user.id, f); setHashing((n) => n - 1); }
+      toast(files.length === 1 ? 'File sealed. Its fingerprint is saved in this browser.' : `${files.length} files sealed.`);
+      await loadVault();
     } catch (err) {
-      console.error('Hashing failed', err);
+      toast(`Could not seal the file: ${err.message}`, 'bad');
     } finally {
-      setHashingFile(false);
+      setHashing(0);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const copyToClipboard = (text, id) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleVerify = async (e) => {
+    const file = e.target.files?.[0];
+    const rec = records.find((r) => r.id === verifyFor);
+    if (!file || !rec) return;
+    const ok = await verifyFile(rec, file);
+    setVerifyResult((x) => ({ ...x, [rec.id]: ok }));
+    toast(ok ? 'Match — this file is unchanged since you sealed it.' : 'No match — this is not the same file, or it was changed.', ok ? 'good' : 'bad');
+    if (verifyInputRef.current) verifyInputRef.current.value = '';
+  };
+
+  const copyToClipboard = async (text, id) => {
+    try { await navigator.clipboard.writeText(text); setCopiedId(id); setTimeout(() => setCopiedId(null), 2000); }
+    catch { toast('Copy failed — select the text and copy it manually.', 'bad'); }
+  };
+
+  const download = (name, content) => {
+    const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: name });
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   };
 
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'vault', label: 'Evidence Vault', icon: ShieldCheck },
     { id: 'deadlines', label: 'Takedown Deadlines', icon: Clock },
-    { id: 'notices', label: 'Platform Notices', icon: FileText },
+    { id: 'report', label: 'Incident Report', icon: FileText },
     { id: 'crisis', label: 'Emergency Support', icon: PhoneCall },
+    { id: 'mimi', label: 'Mimi Extension', icon: Puzzle },
+    { id: 'account', label: 'Account', icon: UserRound },
   ];
 
+  // ---- derived incident state (all from real timestamps) ----
+  const since = incident ? now - incident.discoveredAt : null;
+  const goldenLeft = incident ? GOLDEN_MS - since : null;
+  const nciiDeadline = incident?.noticeSentAt ? incident.noticeSentAt + NCII_MS : null;
+  const nciiLeft = nciiDeadline ? nciiDeadline - now : null;
+  const firstSeal = useMemo(() => (incident ? records.filter((r) => r.sealedAt >= incident.discoveredAt).map((r) => r.sealedAt).sort((a, b) => a - b)[0] : null), [records, incident]);
+  const steps = [
+    { name: 'Triage', done: !!incident?.type },
+    { name: 'Vault', done: records.length > 0 },
+    { name: 'Timer', done: !!incident },
+    { name: 'Notice', done: !!incident?.noticeSentAt },
+  ];
+  const mimiInstalled = mimiStatus.state === 'installed' || mimiStatus.state === 'update';
+  const mimiLinked = mimiInstalled && mimiStatus.account?.status === 'signed-in' && mimiStatus.account.userId === user.id;
+
+  // timeline: discovery → (seal) → (notice) → 2-hour deadline
+  const tl = useMemo(() => {
+    if (!incident) return null;
+    const start = incident.discoveredAt;
+    const end = Math.max(nciiDeadline ?? start + 3 * HOUR, now + 10 * 60000);
+    const x = (t) => 20 + ((t - start) / (end - start)) * 660;
+    const pts = [{ t: start, label: 'Found', key: 'found' }];
+    if (firstSeal) pts.push({ t: firstSeal, label: 'Evidence sealed', key: 'seal' });
+    if (incident.noticeSentAt) pts.push({ t: incident.noticeSentAt, label: 'Notice sent', key: 'notice' });
+    if (nciiDeadline) pts.push({ t: nciiDeadline, label: '2-hour deadline', key: 'deadline' });
+    return { x, pts, nowX: x(Math.min(now, end)), goldenX: x(start + GOLDEN_MS) };
+  }, [incident, firstSeal, nciiDeadline, now]);
+
+  const Sidebar = (
+    <aside className={`w-64 bg-white border-r border-violet-100 flex flex-col justify-between shrink-0 ${drawer ? 'fixed inset-y-0 left-0 z-50 shadow-2xl fade-in-up' : 'hidden md:flex'}`} aria-label="Workspace navigation">
+      <div>
+        <div className="p-6 border-b border-violet-100 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center shadow-[0_0_16px_rgba(168,85,247,0.25)]">
+            <img src="/solace-robot.png" alt="Solace" className="w-7 h-7 object-contain" />
+          </div>
+          <div className="flex-1">
+            <h1 className="text-sm font-bold text-[#1a1028] tracking-tight flex items-center gap-1.5">
+              Solace
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-700">Desk</span>
+            </h1>
+            <p className="text-[10px] font-mono text-zinc-500 uppercase">Incident Triage Engine</p>
+          </div>
+          {drawer && <button onClick={() => setDrawer(false)} className="md:hidden p-1.5 rounded-lg text-zinc-600 hover:text-[#5b21b6] cursor-pointer" aria-label="Close menu"><X className="w-4 h-4" /></button>}
+        </div>
+        <nav className="p-4 space-y-1.5">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = tab === item.id;
+            return (
+              <button key={item.id} onClick={() => go(item.id)} aria-current={isActive ? 'page' : undefined}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium tracking-wide transition-all cursor-pointer ${isActive ? 'bg-purple-600/20 text-[#1a1028] font-semibold border border-purple-500/40 shadow-[0_0_14px_rgba(168,85,247,0.25)]' : 'text-zinc-600 hover:text-[#5b21b6] hover:bg-violet-50 border border-transparent'}`}>
+                <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-600' : 'text-zinc-500'}`} />
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.id === 'mimi' && <span className={`w-1.5 h-1.5 rounded-full ${mimiLinked ? 'bg-emerald-400' : mimiInstalled ? 'bg-amber-400' : 'bg-zinc-600'}`} aria-hidden="true" />}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+      <div className="p-4 border-t border-violet-100">
+        <div className="flex items-center justify-between p-2 rounded-xl bg-violet-50/60 border border-violet-100">
+          <button className="flex items-center gap-2.5 min-w-0 cursor-pointer text-left" onClick={() => go('account')} title="Account">
+            <div className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-tr from-[#7c3aed] to-[#00d4ff] flex items-center justify-center text-xs font-bold text-white font-mono shadow-[0_0_8px_rgba(124,58,237,0.4)]">
+              {user.name ? user.name[0].toUpperCase() : 'S'}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold text-[#1a1028] leading-tight truncate max-w-[110px]">{user.name}</span>
+              <span className="text-[10px] font-mono text-emerald-600 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Local Vault Active
+              </span>
+            </div>
+          </button>
+          <button onClick={handleLogout} title="Sign out" aria-label="Sign out" className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer">
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+
   return (
-    <div className="flex h-screen w-full bg-[#07050b] text-white font-sans overflow-hidden">
-      
-      {/* SIDEBAR */}
-      <aside className="w-64 bg-[#0a0612] border-r border-white/[0.08] flex flex-col justify-between shrink-0">
-        <div>
-          {/* Brand header */}
-          <div className="p-6 border-b border-white/[0.08] flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center shadow-[0_0_16px_rgba(168,85,247,0.25)]">
-              <img
-                src="/solace-robot.png"
-                alt="Solace"
-                className="w-7 h-7 object-contain"
-              />
-            </div>
-            <div>
-              <h1 className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
-                Solace
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300">Desk</span>
-              </h1>
-              <p className="text-[10px] font-mono text-zinc-500 uppercase">Incident Triage Engine</p>
-            </div>
-          </div>
+    <div className="flex h-screen w-full bg-[#faf8ff] text-[#1a1028] font-sans overflow-hidden">
+      {Sidebar}
+      {drawer && <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden" onClick={() => setDrawer(false)} aria-hidden="true" />}
 
-          {/* Navigation Items */}
-          <nav className="p-4 space-y-1.5">
-            {navItems.map(item => {
-              const Icon = item.icon;
-              const isActive = currentTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setCurrentTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium tracking-wide transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-purple-600/20 text-white font-semibold border border-purple-500/40 shadow-[0_0_14px_rgba(168,85,247,0.25)]'
-                      : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-[#00d4ff]' : 'text-zinc-500'}`} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+      <main className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 md:p-10 space-y-8 bg-[#faf8ff]">
+        {/* mobile top bar */}
+        <div className="md:hidden flex items-center justify-between -mt-1">
+          <button onClick={() => setDrawer(true)} className="p-2 rounded-xl bg-violet-50 border border-violet-100 cursor-pointer" aria-label="Open menu" aria-expanded={drawer}><Menu className="w-5 h-5" /></button>
+          <span className="flex items-center gap-2 font-bold"><img src="/solace-robot.png" alt="" className="w-6 h-6" />Solace</span>
+          <a href="tel:112" className="px-3 py-1.5 rounded-full border border-rose-500/40 text-rose-700 text-xs font-mono">112</a>
         </div>
 
-        {/* User profile footer */}
-        <div className="p-4 border-t border-white/[0.08]">
-          <div className="flex items-center justify-between p-2 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#7c3aed] to-[#00d4ff] flex items-center justify-center text-xs font-bold text-white font-mono shadow-[0_0_8px_rgba(124,58,237,0.4)]">
-                {user.name ? user.name[0].toUpperCase() : 'S'}
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-semibold text-white leading-tight truncate max-w-[100px]">
-                  {user.name || 'Survivor'}
-                </span>
-                <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Local Vault Active
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={onLogout}
-              title="Return to Landing Page"
-              className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* MAIN VIEWPORT */}
-      <main className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 bg-[#07050b]">
-        
-        {/* Top Minimalist Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-violet-100">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Incident Response Workspace
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#1a1028] tracking-tight">
+              {tab === 'account' ? 'Account' : tab === 'mimi' ? 'Mimi Extension' : tab === 'report' ? 'Incident Report' : 'Incident Response Workspace'}
             </h2>
-            <p className="text-xs sm:text-sm text-zinc-400 font-light mt-1">
-              Zero cloud exposure · All media hashed locally in browser · Evidence preserved for statutory enforcement
+            <p className="text-xs sm:text-sm text-zinc-600 font-light mt-1">
+              Signed in as {user.email} · Media hashed locally in your browser · Nothing uploaded
             </p>
           </div>
-
-          <div className="flex items-center gap-3">
-            <span className="px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Engine Status: Online & Armed</span>
-            </span>
-          </div>
+          <button onClick={() => go('mimi')} className={`px-3.5 py-1.5 rounded-full text-xs font-mono flex items-center gap-2 cursor-pointer border self-start sm:self-auto ${mimiLinked ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : mimiInstalled ? 'bg-amber-500/10 border-amber-500/25 text-amber-700' : 'bg-violet-50 border-violet-200 text-zinc-700'}`} data-testid="mimi-pill">
+            <span className={`w-2 h-2 rounded-full ${mimiLinked ? 'bg-emerald-400 animate-pulse' : mimiInstalled ? 'bg-amber-400' : 'bg-zinc-500'}`} />
+            <span>{mimiStatus.state === 'checking' ? 'Checking for Mimi…' : mimiLinked ? 'Mimi connected' : mimiInstalled ? 'Mimi installed · connect' : 'Get Mimi extension'}</span>
+          </button>
         </div>
 
-        {/* 1. OVERVIEW TAB */}
-        {currentTab === 'overview' && (
+        {/* 1. OVERVIEW */}
+        {tab === 'overview' && (
           <div className="space-y-8">
-            
-            {/* Top Stat Row: Golden Hour Timer + Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* CURRENT STREAK / GOLDEN HOUR CARD */}
-              <div className="md:col-span-1 p-6 rounded-2xl bg-[#0d0814] border border-white/[0.08] shadow-lg flex flex-col justify-between">
+              <div className={`md:col-span-1 ${card} flex flex-col justify-between`} data-testid="golden-hour">
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-mono tracking-widest text-zinc-400 uppercase">Golden Hour Window</span>
-                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
-                      <Flame className="w-5 h-5 animate-pulse" />
-                    </div>
+                    <span className="text-xs font-mono tracking-widest text-zinc-600 uppercase">Golden Hour Window</span>
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600"><Flame className={`w-5 h-5 ${incident && goldenLeft > 0 ? 'animate-pulse' : ''}`} /></div>
                   </div>
-
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-5xl font-black font-mono text-white tracking-tight">48</span>
-                    <span className="text-sm font-mono text-amber-400 uppercase">Mins Left</span>
-                  </div>
-
-                  <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                    First 60 minutes determine recovery outcome. Cryptographic proof locked client-side.
-                  </p>
+                  {incident ? (
+                    goldenLeft > 0 ? (
+                      <>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-5xl font-black font-mono text-[#1a1028] tracking-tight" aria-live="off">{fmtLeft(goldenLeft)}</span>
+                          <span className="text-sm font-mono text-amber-600 uppercase">left</span>
+                        </div>
+                        <p className="text-xs text-zinc-600 mt-2 leading-relaxed">Since you found it ({fmtSince(since)} ago). Seal evidence and send a notice inside the first hour.</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-3xl font-black font-mono text-[#1a1028] tracking-tight">{fmtSince(since)}</div>
+                        <p className="text-xs text-zinc-600 mt-2 leading-relaxed">since you found it. The first hour has passed — it is still worth acting now.</p>
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <div className="text-2xl font-extrabold text-[#1a1028]">No active incident</div>
+                      <p className="text-xs text-zinc-600 mt-2 leading-relaxed">Found something just now? Start the clock and Solace tracks the first hour and the platform deadline.</p>
+                      <button onClick={startIncident} disabled={incBusy} className="mt-4 px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-700 text-xs font-mono font-bold hover:bg-amber-500/25 transition-colors cursor-pointer disabled:opacity-50">Start clock now</button>
+                    </>
+                  )}
                 </div>
-
-                {/* 4-Stage Protocol Progress */}
-                <div className="mt-6 pt-4 border-t border-white/[0.06]">
+                <div className="mt-6 pt-4 border-t border-violet-100">
                   <span className="text-[10px] font-mono text-zinc-500 uppercase block mb-2">Protocol Execution State</span>
                   <div className="grid grid-cols-4 gap-1.5 text-center">
-                    {[
-                      { step: '01', name: 'Triage', done: true },
-                      { step: '02', name: 'Vault', done: true },
-                      { step: '03', name: 'Timer', done: true },
-                      { step: '04', name: 'Notice', done: false },
-                    ].map((st, idx) => (
-                      <div key={idx} className="flex flex-col items-center gap-1">
+                    {steps.map((st, idx) => (
+                      <div key={st.name} className="flex flex-col items-center gap-1">
                         <span className="text-[9px] font-mono text-zinc-500">{st.name}</span>
-                        <div className={`w-full py-1 rounded-md text-[10px] font-bold font-mono ${
-                          st.done
-                            ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-[0_0_8px_rgba(168,85,247,0.4)]'
-                            : 'bg-white/5 text-zinc-500 border border-white/10'
-                        }`}>
-                          {st.done ? '✓' : st.step}
+                        <div className={`w-full py-1 rounded-md text-[10px] font-bold font-mono ${st.done ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-[0_0_8px_rgba(168,85,247,0.4)]' : 'bg-violet-50 text-zinc-500 border border-violet-200'}`}>
+                          {st.done ? '✓' : String(idx + 1).padStart(2, '0')}
                         </div>
                       </div>
                     ))}
@@ -243,230 +279,79 @@ export default function DashboardView({ user = { name: 'Survivor' }, onLogout })
                 </div>
               </div>
 
-              {/* CONTAINMENT TRAJECTORY (Interactive SVG curve adapted from TuneBreach) */}
-              <div className="md:col-span-2 p-6 rounded-2xl bg-[#0d0814] border border-white/[0.08] shadow-lg flex flex-col justify-between">
+              <div className={`md:col-span-2 ${card} flex flex-col justify-between`} data-testid="takedown-clock">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-mono tracking-widest text-zinc-400 uppercase">Containment Velocity</span>
-                    <span className="text-xs font-mono text-emerald-400">+94.6% takedown probability</span>
+                  <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
+                    <span className="text-xs font-mono tracking-widest text-zinc-600 uppercase">Platform Takedown Clock</span>
+                    {incident && <span className="text-xs font-mono text-purple-700">{concernLabel(incident.type)}</span>}
                   </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-extrabold font-mono text-white">Rule 3(2)(b)</span>
-                    <span className="text-xs font-mono text-zinc-400">2-Hour Statutory Mandate Active</span>
+                  <div className="flex items-baseline gap-3 flex-wrap">
+                    <span className="text-3xl sm:text-4xl font-extrabold font-mono text-[#1a1028]">
+                      {nciiDeadline ? (nciiLeft > 0 ? fmtLeft(nciiLeft) : 'Deadline passed') : 'Rule 3(2)(b)'}
+                    </span>
+                    <span className="text-xs font-mono text-zinc-600">
+                      {nciiDeadline ? (nciiLeft > 0 ? 'left for the platform to remove it (2-hour rule)' : `${fmtSince(-nciiLeft)} ago — escalate on cybercrime.gov.in / 1930`) : '2-hour removal after your complaint — starts when you send it'}
+                    </span>
                   </div>
                 </div>
 
-                {/* Trajectory Graph */}
                 <div className="mt-6">
-                  <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 mb-2">
-                    <span>EVIDENCE INTEGRITY & CHAIN OF CUSTODY</span>
-                    <span className="text-[#00d4ff]">Court Admissibility 100%</span>
-                  </div>
-
-                  <div className="relative h-36 w-full pt-2">
-                    <svg className="w-full h-full overflow-visible" viewBox="0 0 700 120" preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id="incidentGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.4" />
-                          <stop offset="100%" stopColor="#07050b" stopOpacity="0.0" />
-                        </linearGradient>
-                      </defs>
-
-                      <path
-                        d="M 0 95 Q 116 75, 233 50 T 466 25 T 700 10 L 700 120 L 0 120 Z"
-                        fill="url(#incidentGrad)"
-                      />
-
-                      <path
-                        d="M 0 95 Q 116 75, 233 50 T 466 25 T 700 10"
-                        fill="none"
-                        stroke="#00d4ff"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                      />
-
-                      {[
-                        { x: 0, y: 95, label: '0m' },
-                        { x: 116, y: 75, label: '15m' },
-                        { x: 233, y: 50, label: '30m' },
-                        { x: 350, y: 35, label: '45m' },
-                        { x: 466, y: 25, label: '60m' },
-                        { x: 583, y: 15, label: '90m' },
-                        { x: 700, y: 10, label: '120m' }
-                      ].map((pt, i) => (
-                        <circle
-                          key={i}
-                          cx={pt.x}
-                          cy={pt.y}
-                          r="5"
-                          className="fill-[#07050b] stroke-[#00d4ff] stroke-2 hover:r-7 transition-all cursor-pointer"
-                        />
-                      ))}
-                    </svg>
-
-                    <div className="flex justify-between text-[10px] font-mono text-zinc-500 mt-2">
-                      <span>0m (Discovery)</span>
-                      <span>15m (Hash Sealed)</span>
-                      <span>30m (Notice Sent)</span>
-                      <span>45m (Platform Ack)</span>
-                      <span>60m (Escalation)</span>
-                      <span>90m</span>
-                      <span className="text-white font-bold">120m (Mandate Deadline)</span>
+                  {tl ? (
+                    <div className="relative h-32 w-full">
+                      <svg className="w-full h-full overflow-visible" viewBox="0 0 700 110" preserveAspectRatio="none" role="img" aria-label="Incident timeline">
+                        <defs>
+                          <linearGradient id="tlGrad" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#7c3aed" />
+                            <stop offset="100%" stopColor="#00d4ff" />
+                          </linearGradient>
+                        </defs>
+                        <rect x="20" y="52" width="660" height="6" rx="3" fill="rgba(124,58,237,0.10)" />
+                        <rect x="20" y="52" width={Math.max(0, tl.nowX - 20)} height="6" rx="3" fill="url(#tlGrad)" />
+                        <line x1={tl.goldenX} x2={tl.goldenX} y1="38" y2="72" stroke="#f59e0b" strokeDasharray="3 3" />
+                        <line x1={tl.nowX} x2={tl.nowX} y1="30" y2="80" stroke="#1a1028" strokeOpacity="0.5" />
+                        {tl.pts.map((p) => <circle key={p.key} cx={tl.x(p.t)} cy="55" r="6" className="fill-white stroke-[#7c3aed]" strokeWidth="2.5" />)}
+                      </svg>
+                      <div className="absolute inset-x-0 bottom-0 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-zinc-500">
+                        {tl.pts.map((p) => <span key={p.key}><span className="text-cyan-600">●</span> {p.label} {new Date(p.t).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>)}
+                        <span><span className="text-amber-600">┆</span> 1st hour ends</span>
+                        <span className="text-[#1a1028]">│ now</span>
+                      </div>
                     </div>
+                  ) : (
+                    <p className="text-sm text-zinc-500">Start the incident clock to see your timeline.</p>
+                  )}
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {!incident?.noticeSentAt && (
+                      <button onClick={markNoticeSent} disabled={incBusy} className="px-4 py-2 rounded-xl bg-purple-600/20 border border-purple-500/40 text-purple-800 hover:text-[#5b21b6] hover:bg-purple-600/40 text-xs font-mono flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"><Send className="w-3.5 h-3.5" />I’ve sent the notice now</button>
+                    )}
+                    {incident && (
+                      <button onClick={() => updateIncident({ clear: true }, 'Incident clock cleared.')} disabled={incBusy} className="px-4 py-2 rounded-xl text-zinc-600 hover:text-[#5b21b6] text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer"><TimerReset className="w-3.5 h-3.5" />Clear clock</button>
+                    )}
                   </div>
                 </div>
-
               </div>
             </div>
 
-            {/* ACTIONABLE PROTOCOL CARDS */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-purple-400" />
-                  <h3 className="text-base font-bold text-white">Recommended Response Protocols</h3>
-                </div>
-                <span className="text-xs font-mono text-zinc-500">Based on active incident triage</span>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-purple-600" /><h3 className="text-base font-bold text-[#1a1028]">Recommended Response Protocols</h3></div>
+                <span className="text-xs font-mono text-zinc-500">{incident ? `For: ${concernLabel(incident.type)}` : 'Start here'}</span>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                
-                {/* Protocol 1 */}
-                <div className="p-5 rounded-2xl bg-[#0d0814] border border-white/[0.08] hover:border-purple-500/50 transition-all flex flex-col justify-between group">
-                  <div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                      STEP 02 · LOCAL SEAL
-                    </span>
-                    <h4 className="text-sm font-bold text-white mt-2">Cryptographic Evidence Seal</h4>
-                    <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                      Calculate SHA-256 fingerprint on raw media before cloud platforms scrub headers or delete channels.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setCurrentTab('vault')}
-                    className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-purple-400 group-hover:text-[#00d4ff] transition-colors cursor-pointer"
-                  >
-                    <span>Launch Evidence Vault</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-
-                {/* Protocol 2 */}
-                <div className="p-5 rounded-2xl bg-[#0d0814] border border-white/[0.08] hover:border-purple-500/50 transition-all flex flex-col justify-between group">
-                  <div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-400 border border-pink-500/20">
-                      STEP 03 · STATUTORY DEADLINE
-                    </span>
-                    <h4 className="text-sm font-bold text-white mt-2">Rule 3(2)(b) 2-Hour Clock</h4>
-                    <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                      Monitor live timer against statutory Indian IT Rules deadlines. Failure triggers platform safe-harbor forfeiture.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setCurrentTab('deadlines')}
-                    className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-purple-400 group-hover:text-[#00d4ff] transition-colors cursor-pointer"
-                  >
-                    <span>Inspect Takedown Timers</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-
-                {/* Protocol 3 */}
-                <div className="p-5 rounded-2xl bg-[#0d0814] border border-white/[0.08] hover:border-purple-500/50 transition-all flex flex-col justify-between group">
-                  <div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                      STEP 04 · FORMAL NOTICE
-                    </span>
-                    <h4 className="text-sm font-bold text-white mt-2">Pre-Drafted Legal Takedown</h4>
-                    <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                      Copy standardized legal notices cited with section 67A IT Act, Bharatiya Nyaya Sanhita, and Rule 3(2)(b).
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setCurrentTab('notices')}
-                    className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-purple-400 group-hover:text-[#00d4ff] transition-colors cursor-pointer"
-                  >
-                    <span>Generate Platform Notice</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
-        )}
-
-        {/* 2. EVIDENCE VAULT TAB */}
-        {currentTab === 'vault' && (
-          <div className="space-y-6">
-            <div className="p-6 rounded-2xl bg-[#0d0814] border border-white/[0.08]">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div>
-                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <Lock className="w-5 h-5 text-purple-400" />
-                    Local Cryptographic Evidence Vault
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-1">
-                    Zero cloud transmission. Hashes are computed strictly in your local device memory using Web Crypto API.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={hashingFile}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold font-mono tracking-wider hover:opacity-90 transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_16px_rgba(124,58,237,0.4)]"
-                  >
-                    <FileCheck className="w-4 h-4" />
-                    <span>{hashingFile ? 'Computing SHA-256...' : 'Seal New File Locally'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* List of Sealed Items */}
-              <div className="space-y-3">
-                {sealedFiles.map(file => (
-                  <div
-                    key={file.id}
-                    className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-purple-500/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2.5 rounded-lg bg-purple-500/10 text-purple-400 mt-0.5">
-                        <ShieldCheck className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-white">{file.name}</span>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            {file.status}
-                          </span>
-                        </div>
-                        <div className="mt-1 flex items-center gap-2 font-mono text-[11px] text-zinc-400">
-                          <span className="text-zinc-500">SHA-256:</span>
-                          <span className="text-purple-300 select-all truncate max-w-[260px] sm:max-w-md">{file.hash}</span>
-                        </div>
-                        <div className="text-[10px] font-mono text-zinc-500 mt-0.5">
-                          Size: {file.size} · Timestamp: {file.timestamp}
-                        </div>
-                      </div>
+                {[
+                  { tag: 'STEP 02 · LOCAL SEAL', tagCls: 'bg-purple-500/10 text-purple-600 border-purple-500/20', title: 'Cryptographic Evidence Seal', body: 'Fingerprint the original file (SHA-256) before posts, chats or channels disappear.', cta: records.length ? `Open vault (${records.length} sealed)` : 'Launch Evidence Vault', to: 'vault' },
+                  { tag: 'STEP 03 · STATUTORY DEADLINE', tagCls: 'bg-pink-500/10 text-pink-600 border-pink-500/20', title: 'Rule 3(2)(b) 2-Hour Clock', body: 'Platforms must remove intimate or morphed content within 2 hours of your complaint.', cta: 'Inspect Takedown Timers', to: 'deadlines' },
+                  { tag: 'STEP 04 · OFFICIAL REPORT', tagCls: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20', title: 'Police / Authority Report', body: 'Describe what happened, add your photos, and get a formal complaint ready to print or file.', cta: 'Build Incident Report', to: 'report' },
+                ].map((p) => (
+                  <div key={p.to} className="p-5 rounded-2xl bg-white border border-violet-100 hover:border-purple-500/50 transition-all flex flex-col justify-between group">
+                    <div>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${p.tagCls}`}>{p.tag}</span>
+                      <h4 className="text-sm font-bold text-[#1a1028] mt-2">{p.title}</h4>
+                      <p className="text-xs text-zinc-600 mt-1 leading-relaxed">{p.body}</p>
                     </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => copyToClipboard(file.hash, file.id)}
-                        className="px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/10 text-zinc-300 text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        {copiedId === file.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedId === file.id ? 'Hash Copied' : 'Copy Hash'}</span>
-                      </button>
-                    </div>
+                    <button onClick={() => go(p.to)} className="mt-4 pt-3 border-t border-violet-100 flex items-center justify-between text-xs font-mono text-purple-600 group-hover:text-cyan-600 transition-colors cursor-pointer">
+                      <span>{p.cta}</span><ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -474,199 +359,165 @@ export default function DashboardView({ user = { name: 'Survivor' }, onLogout })
           </div>
         )}
 
-        {/* 3. TAKEDOWN DEADLINES TAB */}
-        {currentTab === 'deadlines' && (
+        {/* 2. EVIDENCE VAULT */}
+        {tab === 'vault' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* 2-HOUR CLOCK */}
-              <div className="p-6 rounded-2xl bg-[#0d0814] border border-amber-500/30 shadow-[0_0_24px_rgba(245,158,11,0.1)]">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                    RULE 3(2)(b) IT RULES
-                  </span>
-                  <Clock className="w-5 h-5 text-amber-400 animate-pulse" />
+            <div className="p-6 rounded-2xl bg-white border border-violet-100">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-[#1a1028] flex items-center gap-2"><Lock className="w-5 h-5 text-purple-600" />Local Cryptographic Evidence Vault</h3>
+                  <p className="text-xs text-zinc-600 mt-1">Fingerprints are computed in your browser with the Web Crypto API and kept in this browser for your account. Files are never uploaded — keep the originals safe.</p>
                 </div>
-                <h4 className="text-xl font-bold text-white">2-Hour Emergency Mandate</h4>
-                <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                  Applies to non-consensual intimate imagery, nudity, deepfakes, and impersonation. Intermediaries must remove access within 2 hours of notice.
-                </p>
-                <div className="mt-6 pt-4 border-t border-white/[0.06]">
-                  <div className="text-xs font-mono text-zinc-400">Statutory Consequence:</div>
-                  <div className="text-xs font-bold text-rose-400 mt-1">
-                    Forfeiture of Section 79 Intermediary Safe Harbor Immunity
-                  </div>
-                </div>
-              </div>
-
-              {/* 24-HOUR CLOCK */}
-              <div className="p-6 rounded-2xl bg-[#0d0814] border border-purple-500/30">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                    RULE 3(1)(d)
-                  </span>
-                  <Clock className="w-5 h-5 text-purple-400" />
-                </div>
-                <h4 className="text-xl font-bold text-white">24-Hour Court / Govt Order</h4>
-                <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                  Upon receipt of court order or authorized governmental direction under Section 69A IT Act.
-                </p>
-                <div className="mt-6 pt-4 border-t border-white/[0.06]">
-                  <div className="text-xs font-mono text-zinc-400">Statutory Consequence:</div>
-                  <div className="text-xs font-bold text-amber-400 mt-1">
-                    Contempt of Court & Penal Proceedings
-                  </div>
-                </div>
-              </div>
-
-              {/* 36-HOUR CLOCK */}
-              <div className="p-6 rounded-2xl bg-[#0d0814] border border-cyan-500/30">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                    RULE 3(2)(a)
-                  </span>
-                  <Clock className="w-5 h-5 text-cyan-400" />
-                </div>
-                <h4 className="text-xl font-bold text-white">36-Hour Grievance Disposal</h4>
-                <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                  Grievance Officer acknowledgment within 24 hours, formal determination & remediation within 36-72 hours.
-                </p>
-                <div className="mt-6 pt-4 border-t border-white/[0.06]">
-                  <div className="text-xs font-mono text-zinc-400">Escalation Route:</div>
-                  <div className="text-xs font-bold text-cyan-300 mt-1">
-                    Grievance Appellate Committee (GAC) Appeal
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
-
-        {/* 4. PLATFORM NOTICES TAB */}
-        {currentTab === 'notices' && (
-          <div className="space-y-6">
-            {[
-              {
-                id: 'meta',
-                platform: 'Meta (Instagram / Facebook / WhatsApp)',
-                officer: 'Grievance Officer India - Meta Platforms Inc.',
-                email: 'grievance-officer-india@support.facebook.com',
-                body: `URGENT STATUTORY TAKEDOWN NOTICE UNDER RULE 3(2)(b) OF THE IT (INTERMEDIARY GUIDELINES AND DIGITAL MEDIA ETHICS CODE) RULES, 2021
-
-To: Resident Grievance Officer, Meta Platforms Inc.
-
-Subject: Immediate Takedown Demand - Non-Consensual Intimate Media / Impersonation
-
-1. I am serving this formal notice regarding non-consensual synthetic/intimate media published without authorization.
-2. Under Rule 3(2)(b) of the Information Technology (Intermediary Guidelines) Rules, 2021, you are legally mandated to disable access to such material within TWO (2) HOURS of receipt of this communication.
-3. Cryptographic local proof & SHA-256 seal: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-4. Failure to comply terminates safe-harbor immunity under Section 79 of the IT Act, 2000, rendering the platform directly liable for abetment under Section 67A of the IT Act and relevant provisions of the Bharatiya Nyaya Sanhita (BNS).
-
-Please confirm takedown within the statutory 2-hour window.`
-              },
-              {
-                id: 'telegram',
-                platform: 'Telegram Messenger',
-                officer: 'Telegram Legal & Abuse Takedown Desk',
-                email: 'abuse@telegram.org / stopca@telegram.org',
-                body: `LEGAL DEMAND FOR IMMEDIATE CHANNEL BAN & MEDIA REMOVAL UNDER IT RULES 2021
-
-To: Telegram Abuse Operations & Legal Counsel
-
-Subject: Urgent Rule 3(2)(b) Takedown of Non-Consensual Imagery & Extortion Channel
-
-This communication serves as a formal statutory notice for the immediate removal of non-consensual media circulated on Telegram channels.
-
-Under Indian Information Technology Intermediary Rules, intermediaries are strictly liable to remove intimate deepfakes within 2 hours. Chain of custody is cryptographically logged.
-
-Immediate actions required:
-1. Revoke access to the offending media and ban the distributing account/channel.
-2. Preserve IP logs and transmission metadata for Law Enforcement disclosure pursuant to 1930 / Cyber Crime Portal summons.`
-              }
-            ].map(notice => (
-              <div key={notice.id} className="p-6 rounded-2xl bg-[#0d0814] border border-white/[0.08] space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-white/[0.06]">
-                  <div>
-                    <h4 className="text-base font-bold text-white">{notice.platform}</h4>
-                    <p className="text-xs font-mono text-zinc-400 mt-0.5">{notice.officer} · {notice.email}</p>
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(notice.body, notice.id)}
-                    className="px-4 py-2 rounded-xl bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:text-white hover:bg-purple-600/40 text-xs font-mono flex items-center gap-2 transition-all cursor-pointer self-start sm:self-auto"
-                  >
-                    {copiedId === notice.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedId === notice.id ? 'Notice Copied!' : 'Copy Notice'}</span>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <input type="file" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" data-testid="vault-input" />
+                  <input type="file" ref={verifyInputRef} onChange={handleVerify} className="hidden" />
+                  {records.length > 0 && (
+                    <button onClick={() => download(`solace-vault-${new Date().toISOString().slice(0, 10)}.json`, exportJson(records, user))} className="px-4 py-2.5 rounded-xl bg-violet-50 hover:bg-violet-100 text-zinc-700 text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer"><Download className="w-4 h-4" />Export</button>
+                  )}
+                  <button onClick={() => fileInputRef.current?.click()} disabled={hashing > 0} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold font-mono tracking-wider hover:opacity-90 transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_16px_rgba(124,58,237,0.4)] disabled:opacity-60">
+                    {hashing ? <span className="sol-spinner" /> : <FileCheck className="w-4 h-4" />}
+                    <span>{hashing ? 'Computing SHA-256…' : 'Seal New File Locally'}</span>
                   </button>
                 </div>
-
-                <pre className="p-4 rounded-xl bg-black/40 border border-white/[0.04] text-xs font-mono text-zinc-300 leading-relaxed overflow-x-auto whitespace-pre-wrap">
-                  {notice.body}
-                </pre>
               </div>
-            ))}
-          </div>
-        )}
 
-        {/* 5. EMERGENCY SUPPORT TAB */}
-        {currentTab === 'crisis' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              <div className="p-6 rounded-2xl bg-[#0d0814] border border-rose-500/30 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-2 text-rose-400 font-mono text-xs mb-3">
-                    <PhoneCall className="w-4 h-4 animate-bounce" />
-                    <span>EMERGENCY HELPLINE</span>
+              <div className="space-y-3" data-testid="vault-list">
+                {vaultLoaded && records.length === 0 && (
+                  <div className="p-8 rounded-xl border border-dashed border-violet-200 text-center">
+                    <ShieldCheck className="w-8 h-8 text-purple-600 mx-auto" />
+                    <p className="text-sm text-[#1a1028] font-semibold mt-3">No evidence sealed yet</p>
+                    <p className="text-xs text-zinc-600 mt-1 max-w-md mx-auto">Choose screenshots, videos or voice notes. Solace records each file’s SHA-256 fingerprint, size and time so you can later show the file is unchanged.</p>
                   </div>
-                  <h4 className="text-2xl font-black text-white">1930</h4>
-                  <p className="text-sm font-semibold text-zinc-300 mt-1">
-                    National Cyber Crime Reporting Portal Helpline
-                  </p>
-                  <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                    24/7 dedicated government helpline for cyber frauds, extortion threats, and non-consensual media circulation.
-                  </p>
-                </div>
-                <a
-                  href="tel:1930"
-                  className="mt-6 px-4 py-2.5 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all"
-                >
-                  <PhoneCall className="w-3.5 h-3.5" />
-                  <span>Call 1930 Now</span>
-                </a>
-              </div>
-
-              <div className="p-6 rounded-2xl bg-[#0d0814] border border-purple-500/30 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-2 text-purple-400 font-mono text-xs mb-3">
-                    <ExternalLink className="w-4 h-4" />
-                    <span>OFFICIAL PORTAL</span>
+                )}
+                {records.map((file) => (
+                  <div key={file.id} className="p-4 rounded-xl bg-[#fcfbff] border border-violet-100 hover:border-purple-500/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="p-2.5 rounded-lg bg-purple-500/10 text-purple-600 mt-0.5"><ShieldCheck className="w-5 h-5" /></div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-[#1a1028] break-all">{file.name}</span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">Sealed locally</span>
+                          {verifyResult[file.id] === true && <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 border border-emerald-500/30 flex items-center gap-1"><BadgeCheck className="w-3 h-3" />Verified match</span>}
+                          {verifyResult[file.id] === false && <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-700 border border-rose-500/30">Did not match</span>}
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 font-mono text-[11px] text-zinc-600 min-w-0">
+                          <span className="text-zinc-500 shrink-0">SHA-256:</span>
+                          <span className="text-purple-700 select-all truncate">{file.hash}</span>
+                        </div>
+                        <div className="text-[10px] font-mono text-zinc-500 mt-0.5">Size: {formatSize(file.size)} · Sealed: {istStamp(file.sealedAt)}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <button onClick={() => copyToClipboard(file.hash, file.id)} className="px-3 py-1.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-zinc-700 text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer">
+                        {copiedId === file.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedId === file.id ? 'Hash Copied' : 'Copy Hash'}</span>
+                      </button>
+                      <button onClick={() => { setVerifyFor(file.id); verifyInputRef.current?.click(); }} className="px-3 py-1.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-zinc-700 text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer"><BadgeCheck className="w-3.5 h-3.5" />Verify file</button>
+                      <button onClick={async () => { await deleteRecord(file.id); toast('Removed from the vault.'); loadVault(); }} className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer" aria-label={`Remove ${file.name}`}><Trash2 className="w-4 h-4" /></button>
+                    </div>
                   </div>
-                  <h4 className="text-xl font-bold text-white">cybercrime.gov.in</h4>
-                  <p className="text-sm font-semibold text-zinc-300 mt-1">
-                    Ministry of Home Affairs (MHA)
-                  </p>
-                  <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                    File an anonymous or formal complaint docket under Section 67 / 67A IT Act with your sealed hash evidence.
-                  </p>
-                </div>
-                <a
-                  href="https://cybercrime.gov.in"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-6 px-4 py-2.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/40 hover:bg-purple-500/30 text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Open Official Portal</span>
-                </a>
+                ))}
               </div>
-
+              <p className="text-[11px] text-zinc-500 mt-5 leading-relaxed">A fingerprint shows a file is unchanged since you sealed it; it does not prove who made it. Keep the original files and screenshots with visible dates and usernames. Mimi’s Evidence Locker in the extension saves chats the same way.</p>
             </div>
           </div>
         )}
 
-      </main>
+        {/* 3. TAKEDOWN DEADLINES */}
+        {tab === 'deadlines' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-6 rounded-2xl bg-white border border-amber-500/30 shadow-[0_0_24px_rgba(245,158,11,0.1)]">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">RULE 3(2)(b) IT RULES</span>
+                  <Clock className="w-5 h-5 text-amber-600 animate-pulse" />
+                </div>
+                <h4 className="text-xl font-bold text-[#1a1028]">2-Hour Emergency Removal</h4>
+                <p className="text-xs text-zinc-600 mt-2 leading-relaxed">For content showing a person’s private areas, nudity or sexual acts, or impersonating them — including morphed and deepfake images. The platform must act within 2 hours of the person’s complaint (it was 24 hours before the 2026 amendment).</p>
+                <div className="mt-6 pt-4 border-t border-violet-100">
+                  <div className="text-xs font-mono text-zinc-600">Your clock:</div>
+                  <div className="text-sm font-bold text-amber-700 mt-1 font-mono">{nciiDeadline ? (nciiLeft > 0 ? `${fmtLeft(nciiLeft)} left` : 'Deadline passed — escalate') : 'Not started — record when you send the notice'}</div>
+                  {!incident?.noticeSentAt && <button onClick={markNoticeSent} disabled={incBusy} className="mt-3 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-800 text-xs font-mono cursor-pointer hover:bg-amber-500/25 disabled:opacity-50">I’ve sent it now</button>}
+                  <div className="text-xs font-mono text-zinc-600 mt-4">If it is ignored:</div>
+                  <div className="text-xs font-bold text-rose-600 mt-1">The platform risks losing its Section 79 “safe harbour” protection. Escalate on cybercrime.gov.in / 1930.</div>
+                </div>
+              </div>
 
+              <div className="p-6 rounded-2xl bg-white border border-purple-500/30">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 border border-purple-500/20">RULE 3(1)(d)</span>
+                  <Clock className="w-5 h-5 text-purple-600" />
+                </div>
+                <h4 className="text-xl font-bold text-[#1a1028]">3-Hour Court / Govt Order</h4>
+                <p className="text-xs text-zinc-600 mt-2 leading-relaxed">When a court or an authorised government agency orders unlawful content removed, the platform must act within 3 hours (it was 36 hours before the 2026 amendment). Police can request this after your complaint.</p>
+                <div className="mt-6 pt-4 border-t border-violet-100">
+                  <div className="text-xs font-mono text-zinc-600">How to trigger it:</div>
+                  <div className="text-xs font-bold text-amber-600 mt-1">File on cybercrime.gov.in or call 1930 and share your sealed evidence.</div>
+                </div>
+              </div>
+
+              <div className="p-6 rounded-2xl bg-white border border-cyan-500/30">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 border border-cyan-500/20">RULE 3(2)</span>
+                  <Clock className="w-5 h-5 text-cyan-600" />
+                </div>
+                <h4 className="text-xl font-bold text-[#1a1028]">7-Day Grievance Resolution</h4>
+                <p className="text-xs text-zinc-600 mt-2 leading-relaxed">Other complaints to a platform’s Grievance Officer must be resolved within 7 days (reduced from 15 days in 2026).</p>
+                <div className="mt-6 pt-4 border-t border-violet-100">
+                  <div className="text-xs font-mono text-zinc-600">Escalation Route:</div>
+                  <div className="text-xs font-bold text-cyan-700 mt-1">Grievance Appellate Committee (gac.gov.in)</div>
+                </div>
+              </div>
+            </div>
+            <p className="text-[11px] text-zinc-500 leading-relaxed">
+              Based on the IT (Intermediary Guidelines and Digital Media Ethics Code) Amendment Rules, 2026 (G.S.R. 120(E), notified 10 Feb 2026, in force 20 Feb 2026). Solace is not a lawyer; check the official text. Sources:{' '}
+              {SOURCES.map(([t, u], i) => <span key={u}>{i ? ' · ' : ''}<a href={u} target="_blank" rel="noreferrer" className="text-purple-700 underline underline-offset-2">{t}</a></span>)}. Free legal aid: NALSA 15100.
+            </p>
+          </div>
+        )}
+
+        {/* 4. INCIDENT REPORT */}
+        {tab === 'report' && <ReportBuilder records={records} onSealed={loadVault} />}
+
+        {/* 5. EMERGENCY SUPPORT */}
+        {tab === 'crisis' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-6 rounded-2xl bg-white border border-rose-500/50 flex flex-col justify-between shadow-[0_0_24px_rgba(244,63,94,0.12)]">
+                <div>
+                  <div className="flex items-center gap-2 text-rose-600 font-mono text-xs mb-3"><PhoneCall className="w-4 h-4" /><span>IN DANGER NOW</span></div>
+                  <h4 className="text-2xl font-black text-[#1a1028]">112</h4>
+                  <p className="text-sm font-semibold text-zinc-700 mt-1">Emergency Response (police, ambulance)</p>
+                  <p className="text-xs text-zinc-600 mt-2 leading-relaxed">If someone threatens to hurt you or is near you, call now.</p>
+                </div>
+                <a href="tel:112" className="mt-6 px-4 py-2.5 rounded-xl bg-rose-600 text-white hover:bg-rose-500 text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all"><PhoneCall className="w-3.5 h-3.5" /><span>Call 112</span></a>
+              </div>
+              <div className="p-6 rounded-2xl bg-white border border-rose-500/30 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-rose-600 font-mono text-xs mb-3"><PhoneCall className="w-4 h-4 animate-bounce" /><span>CYBER CRIME HELPLINE</span></div>
+                  <h4 className="text-2xl font-black text-[#1a1028]">1930</h4>
+                  <p className="text-sm font-semibold text-zinc-700 mt-1">National Cyber Crime Helpline</p>
+                  <p className="text-xs text-zinc-600 mt-2 leading-relaxed">For cyber fraud, extortion threats and non-consensual media circulation.</p>
+                </div>
+                <a href="tel:1930" className="mt-6 px-4 py-2.5 rounded-xl bg-rose-500/20 text-rose-700 border border-rose-500/40 hover:bg-rose-500/30 text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all"><PhoneCall className="w-3.5 h-3.5" /><span>Call 1930 Now</span></a>
+              </div>
+              <div className="p-6 rounded-2xl bg-white border border-purple-500/30 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-purple-600 font-mono text-xs mb-3"><ExternalLink className="w-4 h-4" /><span>OFFICIAL PORTAL</span></div>
+                  <h4 className="text-xl font-bold text-[#1a1028]">cybercrime.gov.in</h4>
+                  <p className="text-sm font-semibold text-zinc-700 mt-1">Ministry of Home Affairs (MHA)</p>
+                  <p className="text-xs text-zinc-600 mt-2 leading-relaxed">File a complaint (there is a separate women &amp; children section) and attach your sealed evidence.</p>
+                </div>
+                <a href="https://cybercrime.gov.in" target="_blank" rel="noreferrer" className="mt-6 px-4 py-2.5 rounded-xl bg-purple-500/20 text-purple-700 border border-purple-500/40 hover:bg-purple-500/30 text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all"><ExternalLink className="w-3.5 h-3.5" /><span>Open Official Portal</span></a>
+              </div>
+            </div>
+            <p className="text-[11px] text-zinc-500">Free legal aid: NALSA helpline 15100. Intimate images being shared? StopNCII.org can help block re-uploads on partner platforms without uploading your image.</p>
+          </div>
+        )}
+
+        {tab === 'mimi' && <MimiPanel status={mimiStatus} autoLink={autoLink} />}
+        {tab === 'account' && <AccountPanel onSignOut={handleLogout} />}
+      </main>
     </div>
   );
 }

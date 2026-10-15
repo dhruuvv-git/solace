@@ -1,247 +1,163 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
+import { useAuth } from '../lib/auth';
 
-export default function AuthModal({ onClose, onSuccess }) {
-  const [isSignUp, setIsSignUp] = useState(true);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,63}$/;
 
-  const handleSubmit = (e) => {
-    if (e) e.preventDefault();
-    if (onSuccess) {
-      onSuccess({ name: name.trim() || (isSignUp ? 'Dhruv' : 'Dhruv') });
-    }
-    if (onClose) {
-      onClose();
+/** Same checks as the server (server/app.mjs → validateSignup); the server stays the authority. */
+function validate(isSignUp, f) {
+  const e = {};
+  if (isSignUp && !f.name.trim()) e.name = 'Enter your name or a nickname.';
+  if (!f.email.trim()) e.email = 'Enter your email address.';
+  else if (!EMAIL_RE.test(f.email.trim())) e.email = 'That email address doesn’t look right.';
+  if (!f.password) e.password = isSignUp ? 'Choose a password.' : 'Enter your password.';
+  else if (isSignUp && f.password.length < 8) e.password = 'Use at least 8 characters.';
+  else if (isSignUp && (!/[A-Za-z]/.test(f.password) || !/[0-9]/.test(f.password))) e.password = 'Use at least one letter and one number.';
+  if (isSignUp && f.password && f.confirm !== f.password) e.confirm = 'Passwords don’t match.';
+  return e;
+}
+
+function Field({ id, label, error, children, hint }) {
+  return (
+    <div className="sol-field">
+      <label className="sol-label" htmlFor={id}>{label}</label>
+      {children}
+      {error ? <span className="sol-error" id={`${id}-err`} role="alert">{error}</span> : hint ? <span className="sol-hint" id={`${id}-hint`}>{hint}</span> : null}
+    </div>
+  );
+}
+
+export default function AuthModal({ mode = 'signup', onModeChange, onClose, onSuccess, notice }) {
+  const auth = useAuth();
+  const isSignUp = mode === 'signup';
+  const [f, setF] = useState({ name: '', email: '', password: '', confirm: '' });
+  const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [show, setShow] = useState(false);
+  const cardRef = useRef(null);
+  const firstRef = useRef(null);
+
+  useEffect(() => { setErrors({}); setFormError(null); firstRef.current?.focus(); }, [mode]);
+  useEffect(() => {
+    const prev = document.activeElement;
+    const onKey = (e) => {
+      if (e.key === 'Escape' && !busy) onClose?.();
+      if (e.key === 'Tab' && cardRef.current) { // keep focus inside the dialog
+        const els = cardRef.current.querySelectorAll('button, input, a[href]');
+        const first = els[0], last = els[els.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = overflow; prev?.focus?.(); };
+  }, [onClose, busy]);
+
+  const set = (k) => (e) => { setF((x) => ({ ...x, [k]: e.target.value })); if (errors[k]) setErrors((x) => ({ ...x, [k]: undefined })); };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (busy) return;
+    setFormError(null);
+    const v = validate(isSignUp, f);
+    setErrors(v);
+    if (Object.keys(v).length) { cardRef.current?.querySelector(`#auth-${Object.keys(v)[0]}`)?.focus(); return; }
+    setBusy(true);
+    try {
+      const user = isSignUp ? await auth.signUp(f.name.trim(), f.email.trim(), f.password) : await auth.signIn(f.email.trim(), f.password);
+      onSuccess?.(user, { created: isSignUp });
+    } catch (err) {
+      if (err.fields && Object.keys(err.fields).length) setErrors(err.fields);
+      if (err.code === 'email_taken') setFormError(<>An account with this email already exists. <button type="button" className="sol-btn sol-btn--link" onClick={() => onModeChange?.('signin')}>Log in instead</button></>);
+      else setFormError(err.message);
+      setF((x) => ({ ...x, password: err.code === 'invalid_credentials' ? '' : x.password, confirm: '' }));
+    } finally {
+      setBusy(false);
     }
   };
 
+  const inputProps = (k) => ({ id: `auth-${k}`, className: 'sol-input', value: f[k], onChange: set(k), 'aria-invalid': errors[k] ? 'true' : undefined, 'aria-describedby': errors[k] ? `auth-${k}-err` : undefined, disabled: busy });
+
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 50,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 24,
-        background: 'rgba(10, 6, 18, 0.42)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          position: 'relative',
-          width: '100%', maxWidth: 900,
-          borderRadius: 40,
-          padding: '64px 72px',
-          background: '#ffffff',
-          border: '1px solid rgba(221, 214, 254, 0.6)',
-          boxShadow: '0 24px 80px rgba(0, 0, 0, 0.18), 0 0 50px rgba(168, 85, 247, 0.08)',
-        }}
-      >
-        {/* Close */}
+    <div className="sol-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose?.(); }}>
+      <div ref={cardRef} className="sol-auth-card sol-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
         <button
-          onClick={onClose}
-          style={{
-            position: 'absolute', top: 28, right: 28,
-            width: 48, height: 48, borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: '#ede9fe', border: 'none', cursor: 'pointer',
-            color: '#7c3aed', transition: 'background 0.2s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#ddd6fe'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = '#ede9fe'; }}
-          aria-label="Close"
+          type="button" onClick={onClose} disabled={busy} aria-label="Close"
+          style={{ position: 'absolute', top: 24, right: 24, width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ede9fe', border: 'none', cursor: 'pointer', color: '#7c3aed', transition: 'background 0.2s' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#ddd6fe'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = '#ede9fe'; }}
         >
           <X size={22} />
         </button>
 
-        {/* Header */}
-        <div style={{ marginBottom: 48 }}>
-          <h2 style={{
-            fontSize: 56, fontWeight: 900, color: '#0f0a1a',
-            letterSpacing: '-0.03em', lineHeight: 1, marginBottom: 12,
-          }}>
+        <div style={{ marginBottom: 36, paddingRight: 56 }}>
+          <h2 id="auth-title" className="sol-auth-title" style={{ fontSize: 56, fontWeight: 900, color: '#0f0a1a', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: 12 }}>
             {isSignUp ? 'Sign Up' : 'Log In'}
           </h2>
-          <p style={{ fontSize: 17, color: '#6b7280', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
+          <p style={{ fontSize: 16, color: '#6b7280', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
             {isSignUp ? 'Join Solace Workspace' : 'Welcome back to Solace'}
           </p>
         </div>
 
-        {/* Two columns */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 56, alignItems: 'start' }}>
+        {notice && <div className="sol-alert sol-alert--info" style={{ marginBottom: 20 }}>{notice}</div>}
 
-          {/* Left: inputs */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={submit} noValidate className="sol-auth-grid">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {isSignUp && (
-              <input
-                type="text" placeholder="Full Name"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                style={{
-                  width: '100%', padding: '18px 24px', borderRadius: 16,
-                  fontSize: 16, fontWeight: 500, color: '#1a1028',
-                  background: 'rgba(255,255,255,0.9)',
-                  border: '1.5px solid #ddd6fe',
-                  outline: 'none', fontFamily: 'inherit',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.2s, box-shadow 0.2s',
-                }}
-                onFocus={e => { e.target.style.borderColor = '#a855f7'; e.target.style.boxShadow = '0 0 0 4px rgba(168,85,247,0.15)'; }}
-                onBlur={e => { e.target.style.borderColor = '#ddd6fe'; e.target.style.boxShadow = 'none'; }}
-              />
+              <Field id="auth-name" label="Name" error={errors.name}>
+                <input ref={firstRef} type="text" autoComplete="name" placeholder="Full name or nickname" maxLength={80} {...inputProps('name')} />
+              </Field>
             )}
-            <input
-              type="email" placeholder="Email Address"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              style={{
-                width: '100%', padding: '18px 24px', borderRadius: 16,
-                fontSize: 16, fontWeight: 500, color: '#1a1028',
-                background: 'rgba(255,255,255,0.9)',
-                border: '1.5px solid #ddd6fe',
-                outline: 'none', fontFamily: 'inherit',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.2s, box-shadow 0.2s',
-              }}
-              onFocus={e => { e.target.style.borderColor = '#a855f7'; e.target.style.boxShadow = '0 0 0 4px rgba(168,85,247,0.15)'; }}
-              onBlur={e => { e.target.style.borderColor = '#ddd6fe'; e.target.style.boxShadow = 'none'; }}
-            />
-            <input
-              type="password" placeholder="Password"
-              style={{
-                width: '100%', padding: '18px 24px', borderRadius: 16,
-                fontSize: 16, fontWeight: 500, color: '#1a1028',
-                background: 'rgba(255,255,255,0.9)',
-                border: '1.5px solid #ddd6fe',
-                outline: 'none', fontFamily: 'inherit',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.2s, box-shadow 0.2s',
-              }}
-              onFocus={e => { e.target.style.borderColor = '#a855f7'; e.target.style.boxShadow = '0 0 0 4px rgba(168,85,247,0.15)'; }}
-              onBlur={e => { e.target.style.borderColor = '#ddd6fe'; e.target.style.boxShadow = 'none'; }}
-            />
+            <Field id="auth-email" label="Email" error={errors.email}>
+              <input ref={isSignUp ? undefined : firstRef} type="email" autoComplete="email" inputMode="email" placeholder="Email address" maxLength={254} {...inputProps('email')} />
+            </Field>
+            <Field id="auth-password" label="Password" error={errors.password} hint={isSignUp ? 'At least 8 characters, with a letter and a number.' : undefined}>
+              <div className="sol-pass">
+                <input type={show ? 'text' : 'password'} autoComplete={isSignUp ? 'new-password' : 'current-password'} placeholder="Password" maxLength={128} {...inputProps('password')} />
+                <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? 'Hide password' : 'Show password'} aria-pressed={show}>{show ? 'Hide' : 'Show'}</button>
+              </div>
+            </Field>
             {isSignUp && (
-              <input
-                type="password" placeholder="Confirm Password"
-                style={{
-                  width: '100%', padding: '18px 24px', borderRadius: 16,
-                  fontSize: 16, fontWeight: 500, color: '#1a1028',
-                  background: 'rgba(255,255,255,0.9)',
-                  border: '1.5px solid #ddd6fe',
-                  outline: 'none', fontFamily: 'inherit',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.2s, box-shadow 0.2s',
-                }}
-                onFocus={e => { e.target.style.borderColor = '#a855f7'; e.target.style.boxShadow = '0 0 0 4px rgba(168,85,247,0.15)'; }}
-                onBlur={e => { e.target.style.borderColor = '#ddd6fe'; e.target.style.boxShadow = 'none'; }}
-              />
+              <Field id="auth-confirm" label="Confirm password" error={errors.confirm}>
+                <input type={show ? 'text' : 'password'} autoComplete="new-password" placeholder="Confirm password" maxLength={128} {...inputProps('confirm')} />
+              </Field>
             )}
           </div>
 
-          {/* Right: actions */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Primary button — glossy */}
-            <button
-              onClick={handleSubmit}
-              style={{
-                width: '100%', padding: '20px 32px',
-                borderRadius: 999, fontSize: 18, fontWeight: 800, color: '#fff',
-                border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                background: 'linear-gradient(160deg, #9b6ce8 0%, #7c3aed 50%, #5b21b6 100%)',
-                boxShadow: '0 0 0 1px rgba(255,255,255,0.2) inset, 0 2px 0 rgba(255,255,255,0.25) inset, 0 16px 48px rgba(124,58,237,0.4)',
-                transition: 'transform 0.2s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
-            >
-              {isSignUp ? 'Sign Up' : 'Log In'}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 24 }}>
+            {formError && <div className="sol-alert sol-alert--error" role="alert">{formError}</div>}
+            <button type="submit" className="sol-btn sol-btn--primary sol-btn--lg sol-btn--block" disabled={busy} aria-busy={busy}>
+              {busy && <span className="sol-spinner" aria-hidden="true" />}
+              {busy ? (isSignUp ? 'Creating your account…' : 'Logging in…') : isSignUp ? 'Sign Up' : 'Log In'}
             </button>
 
-            {/* Switch */}
             <div style={{ textAlign: 'center', fontSize: 15, color: '#6b7280', fontWeight: 500 }}>
-              {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
-              <button
-                onClick={() => setIsSignUp(!isSignUp)}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: '#7c3aed', fontWeight: 700, fontSize: 15,
-                  fontFamily: 'inherit', textDecoration: 'underline',
-                  textUnderlineOffset: 3,
-                }}
-              >
+              {isSignUp ? 'Already have an account? ' : 'Don’t have an account? '}
+              <button type="button" className="sol-btn sol-btn--link" style={{ fontSize: 15 }} disabled={busy} onClick={() => onModeChange?.(isSignUp ? 'signin' : 'signup')}>
                 {isSignUp ? 'Log in' : 'Sign up'}
               </button>
             </div>
 
-            {/* Divider */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ flex: 1, height: 1, background: '#ede9fe' }} />
-              <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#9ca3af', fontWeight: 700, letterSpacing: '0.1em' }}>OR</span>
+              <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#9ca3af', fontWeight: 700, letterSpacing: '0.1em' }}>ONE ACCOUNT</span>
               <div style={{ flex: 1, height: 1, background: '#ede9fe' }} />
             </div>
 
-            {/* Google */}
-            <button
-              type="button"
-              onClick={() => handleSubmit()}
-              style={{
-                width: '100%', padding: '16px 24px', borderRadius: 14,
-                fontSize: 15, fontWeight: 700, color: '#374151',
-                border: '1.5px solid #ede9fe', background: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-                cursor: 'pointer', fontFamily: 'inherit',
-                boxShadow: '0 2px 8px rgba(124,58,237,0.06)',
-                transition: 'background 0.2s, box-shadow 0.2s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#faf8ff'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(124,58,237,0.1)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(124,58,237,0.06)'; }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24">
-                <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z" />
-                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
-                <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 10.8 0 12.5s.7 2.8 1.9 5.2l3.7-2.9z" />
-                <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2-6.4-4.8L1.9 17.4C3.7 21.1 7.5 24 12 24z" />
-              </svg>
-              {isSignUp ? 'Sign up with Google' : 'Log in with Google'}
-            </button>
-
-            {/* Facebook */}
-            <button
-              type="button"
-              onClick={() => handleSubmit()}
-              style={{
-                width: '100%', padding: '16px 24px', borderRadius: 14,
-                fontSize: 15, fontWeight: 700, color: '#374151',
-                border: '1.5px solid #ede9fe', background: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-                cursor: 'pointer', fontFamily: 'inherit',
-                boxShadow: '0 2px 8px rgba(124,58,237,0.06)',
-                transition: 'background 0.2s, box-shadow 0.2s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#faf8ff'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(124,58,237,0.1)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(124,58,237,0.06)'; }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="#1877F2">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-              </svg>
-              {isSignUp ? 'Sign up with Facebook' : 'Log in with Facebook'}
-            </button>
+            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10, fontSize: 14, color: '#4b5563', lineHeight: 1.55 }}>
+              <li style={{ display: 'flex', gap: 10 }}><span aria-hidden="true" style={{ color: '#7c3aed', fontWeight: 900 }}>01</span>Same login for this workspace and the Mimi browser extension.</li>
+              <li style={{ display: 'flex', gap: 10 }}><span aria-hidden="true" style={{ color: '#7c3aed', fontWeight: 900 }}>02</span>Evidence files are fingerprinted in your browser and never uploaded.</li>
+              <li style={{ display: 'flex', gap: 10 }}><span aria-hidden="true" style={{ color: '#7c3aed', fontWeight: 900 }}>03</span>Your password is stored only as a salted scrypt hash.</li>
+            </ul>
           </div>
-        </div>
+        </form>
 
-        {/* Footer */}
-        <div style={{
-          marginTop: 48, paddingTop: 28,
-          borderTop: '1px solid #ede9fe',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          fontSize: 13, fontFamily: 'monospace', color: '#9ca3af',
-          letterSpacing: '0.04em',
-        }}>
-          <span>End-to-end encrypted · Local hashing</span>
-          <span>Anonymous mode available</span>
+        <div className="sol-auth-foot" style={{ marginTop: 36, paddingTop: 22, borderTop: '1px solid #ede9fe', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, fontFamily: 'monospace', color: '#9ca3af', letterSpacing: '0.04em' }}>
+          <span>Local hashing · No media uploads</span>
+          <span>A nickname is fine — no real name needed</span>
         </div>
       </div>
     </div>

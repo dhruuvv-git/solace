@@ -1,0 +1,95 @@
+/*
+ * Solace design tokens — extracted from the landing page (src/components/HeroSection,
+ * Navbar, NotAloneSection, SolutionSection, AuthModal). Single source for the website,
+ * the dashboard and the Mimi extension. Change a value here, both products follow.
+ *
+ * Two surfaces, as on the landing page:
+ *   dark  — hero / navbar / dashboard (#07050b night, glass borders, aurora accents)
+ *   light — "You are not alone" / "Response Protocol" sections (lavender paper)
+ */
+:root {
+  /* night surfaces */
+  --sol-night: #07050b;
+  --sol-night-2: #0a0612;
+  --sol-card: #0d0814;
+  --sol-card-2: #120b1c;
+  --sol-glass: rgba(255, 255, 255, 0.04);
+  --sol-glass-2: rgba(255, 255, 255, 0.07);
+  --sol-line: rgba(255, 255, 255, 0.08);
+  --sol-line-2: rgba(255, 255, 255, 0.14);
+  --sol-text: #f1f5f9;
+  --sol-text-2: #cbd5e1;
+  --sol-muted: #94a3b8;
+  --sol-muted-2: #71717a;
+
+  /* lavender paper */
+  --sol-paper: #faf8ff;
+  --sol-paper-2: #f5f0ff;
+  --sol-paper-3: #f0ebff;
+  --sol-lilac: #ede9fe;
+  --sol-lilac-2: #ddd6fe;
+  --sol-ink: #0f0a1a;
+  --sol-ink-2: #1a1028;
+  --sol-ink-muted: #6b7280;
+  --sol-ink-muted-2: #9ca3af;
+
+  /* brand */
+  --sol-violet: #7c3aed;
+  --sol-violet-light: #9b6ce8;
+  --sol-violet-deep: #5b21b6;
+  --sol-purple: #a855f7;
+  --sol-purple-soft: #a78bfa;
+  --sol-orchid: #d946ef;
+  --sol-magenta: #c026d3;
+  --sol-pink: #ec4899;
+  --sol-cyan: #00d4ff;
+  --sol-sky: #38bdf8;
+
+  /* meaning (kept separate from brand) */
+  --sol-good: #34d399;
+  --sol-good-bg: rgba(16, 185, 129, 0.12);
+  --sol-warn: #fbbf24;
+  --sol-warn-bg: rgba(245, 158, 11, 0.12);
+  --sol-bad: #fb7185;
+  --sol-bad-bg: rgba(244, 63, 94, 0.13);
+  --sol-neutral: #a1a1aa;
+  --sol-neutral-bg: rgba(161, 161, 170, 0.14);
+
+  /* gradients & glows */
+  --sol-grad-primary: linear-gradient(160deg, #9b6ce8 0%, #7c3aed 50%, #5b21b6 100%);
+  --sol-grad-text: linear-gradient(135deg, #7c3aed, #c026d3);
+  --sol-grad-sky: linear-gradient(135deg, #ffffff 0%, #38bdf8 60%, #00d4ff 100%);
+  --sol-grad-avatar: linear-gradient(45deg, #7c3aed, #00d4ff);
+  --sol-shadow-primary: 0 0 0 1px rgba(255, 255, 255, 0.18) inset, 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 6px 20px rgba(124, 58, 237, 0.4);
+  --sol-shadow-primary-lg: 0 0 0 1px rgba(255, 255, 255, 0.15) inset, 0 2px 0 rgba(255, 255, 255, 0.2) inset, 0 20px 60px rgba(124, 58, 237, 0.45);
+  --sol-shadow-card-light: 0 4px 24px rgba(124, 58, 237, 0.07);
+  --sol-shadow-card-light-hover: 0 16px 48px rgba(124, 58, 237, 0.14);
+  --sol-shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.18), 0 0 50px rgba(168, 85, 247, 0.08);
+  --sol-glow: 0 0 16px rgba(168, 85, 247, 0.25);
+  --sol-ring: 0 0 0 4px rgba(168, 85, 247, 0.18);
+
+  /* type */
+  --sol-font: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --sol-font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --sol-font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --sol-eyebrow-tracking: 0.16em;
+
+  /* shape */
+  --sol-r-xs: 6px;
+  --sol-r-sm: 10px;
+  --sol-r-md: 14px;
+  --sol-r-lg: 18px;
+  --sol-r-xl: 24px;
+  --sol-r-2xl: 32px;
+  --sol-r-pill: 999px;
+
+  /* motion */
+  --sol-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --sol-fast: 150ms;
+  --sol-med: 250ms;
+  --sol-slow: 450ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --sol-fast: 0ms; --sol-med: 0ms; --sol-slow: 0ms; }
+}

@@ -1,0 +1,14 @@
+{
+  "_readme": "Shared by the website, the API server and the Mimi extension. For a live domain: set appUrl, add its origin to appOrigins (extension pattern) and apiAllowedOrigins (exact origin), then rebuild the extension.",
+  "appName": "Solace",
+  "assistantName": "Mimi",
+  "appUrl": "http://localhost:5173/",
+  "apiPort": 8787,
+  "appOrigins": [
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "apiAllowedOrigins": [],
+  "extensionKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu14mIm/kDiVwOl8sunw/Q9cX8LT4C9yWWOkGH1v1iAL1oKmcAjLG6cIOaSW3KJP630X1nTVxfYnvYYwHnD3c5tMmuWrk5izQ+HTbA+l1QNBY4cc35NSIRZFZHqZswJBnS1h+s1AbAL4QmdwA9OH3o1QFnJ5CZvksvOqxxlA0ERaOF7JEJSO0dQvxe85UjJPCuWhg7nS4OlZpYhH+W1LIKKRekmHr/qvP7ZvRmS9I3ZY6nw4sQ8rPkcHeFLT9XlnqT4BWZZau5pAj9A7X7R2hWcmvqa3RgR/mDiqzsrHg56BQMoZodwRGTaB4hh5i4dtyRmRhoYDoXDJe8DRG9bJfYQIDAQAB",
+  "extensionId": "gkjdoahaifebddccafjnenhmjcgokcdf"
+}

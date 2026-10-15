@@ -5,6 +5,7 @@ export default function HeroSection({ onGetStarted }) {
   return (
     <section
       id="hero"
+      className="sol-hero"
       style={{
         minHeight: '100vh',
         display: 'flex',

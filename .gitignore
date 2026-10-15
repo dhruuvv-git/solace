@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Solace
+server/data/
+extension/node_modules
+extension/dist
+extension/*.zip
+public/downloads/*.zip

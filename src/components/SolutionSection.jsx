@@ -36,6 +36,7 @@ export default function SolutionSection({ onGetStarted }) {
   return (
     <section
       id="solution"
+      className="sol-section"
       style={{
         padding: '140px 80px 160px',
         background: 'linear-gradient(180deg, #f5f0ff 0%, #faf8ff 50%, #f0ebff 100%)',
@@ -111,7 +112,7 @@ export default function SolutionSection({ onGetStarted }) {
         </div>
 
         {/* 4 Step Cards */}
-        <div style={{
+        <div className="sol-grid-4" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
           gap: 28,
@@ -185,6 +186,7 @@ export default function SolutionSection({ onGetStarted }) {
         <div style={{ textAlign: 'center', paddingTop: 20 }}>
           <FadeUp delay={500}>
             <button
+              className="sol-cta-big"
               onClick={onGetStarted}
               style={{
                 padding: '24px 72px',
