@@ -1,7 +1,7 @@
 /**
- * Solace API client. Same-origin requests (the dev server proxies /api to the API
- * on port 8787; in production the API serves the site), so the HttpOnly session
- * cookie travels automatically and no token is ever visible to page JavaScript.
+ * Serverless API stub — no backend required for hackathon/Vercel static deployment.
+ * All calls that previously hit the server are replaced with localStorage no-ops or
+ * are handled directly in auth.jsx via LocalAuth.
  */
 export class ApiError extends Error {
   constructor(status, code, message, fields) {
@@ -13,46 +13,60 @@ export class ApiError extends Error {
 }
 
 const listeners = new Set();
-/** Called with the error whenever the server says the session ended. */
 export function onSessionExpired(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 
-export async function api(method, path, body) {
-  let res;
-  try {
-    res = await fetch(`/api${path}`, {
-      method,
-      credentials: 'same-origin',
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-  } catch {
-    throw new ApiError(0, 'offline', 'Can’t reach Solace. Check your connection — if you are running locally, start it with “npm run dev”.');
-  }
-  let data = null;
-  try { data = await res.json(); } catch { /* empty body */ }
-  if (!res.ok) {
-    if (res.status === 502 || res.status === 504 || (res.status === 500 && !data)) {
-      throw new ApiError(res.status, 'offline', 'The Solace server is not running. Start it with “npm run dev”.');
-    }
-    const err = new ApiError(res.status, data?.error || 'error', data?.message || `Request failed (${res.status}).`, data?.fields);
-    if (res.status === 401 && err.code === 'session_expired') listeners.forEach((fn) => fn(err));
-    throw err;
-  }
-  return data;
-}
-
+// No-op stubs — each returns a resolved promise with sensible defaults.
 export const Api = {
-  me: () => api('GET', '/auth/me'),
-  signUp: (b) => api('POST', '/auth/signup', b),
-  signIn: (b) => api('POST', '/auth/signin', b),
-  signOut: () => api('POST', '/auth/signout', {}),
-  updateAccount: (b) => api('PATCH', '/account', b),
-  onboarding: (b) => api('POST', '/account/onboarding', b),
-  incident: (b) => api('PUT', '/account/incident', b),
-  deleteAccount: (password) => api('DELETE', '/account', { password }),
-  settings: () => api('GET', '/settings'),
-  saveSettings: (settings) => api('PUT', '/settings', { settings }),
-  linkCode: () => api('POST', '/extension/link-code', {}),
-  devices: () => api('GET', '/extension/devices'),
-  revokeDevice: (id) => api('DELETE', `/extension/devices/${encodeURIComponent(id)}`, {}),
+  me: async () => { return { user: null }; },
+  signUp: async () => { return { user: null }; },
+  signIn: async () => { return { user: null }; },
+  signOut: async () => {},
+  updateAccount: async (b) => {
+    // Persist name change locally
+    const sess = (() => { try { return JSON.parse(localStorage.getItem('solace_session')); } catch { return null; } })();
+    if (sess && b.name) {
+      sess.user.name = b.name;
+      localStorage.setItem('solace_session', JSON.stringify(sess));
+    }
+    return { user: sess?.user ?? {} };
+  },
+  onboarding: async (b) => {
+    // Store onboarding data in the localStorage user profile
+    const sess = (() => { try { return JSON.parse(localStorage.getItem('solace_session')); } catch { return null; } })();
+    if (sess) {
+      sess.user.onboarding = { completed: true, concern: b.concern };
+      if (b.startIncident) sess.user.incident = { type: b.concern, discoveredAt: Date.now() };
+      localStorage.setItem('solace_session', JSON.stringify(sess));
+
+      // Also persist in users store
+      const users = (() => { try { return JSON.parse(localStorage.getItem('solace_users') || '{}'); } catch { return {}; } })();
+      if (users[sess.user.email]) {
+        users[sess.user.email].user = sess.user;
+        localStorage.setItem('solace_users', JSON.stringify(users));
+      }
+      return { user: sess.user };
+    }
+    return { user: {} };
+  },
+  incident: async (b) => {
+    const sess = (() => { try { return JSON.parse(localStorage.getItem('solace_session')); } catch { return null; } })();
+    if (sess) {
+      const t = b.discoveredAt || Date.now();
+      sess.user.incident = { type: b.type, discoveredAt: t };
+      localStorage.setItem('solace_session', JSON.stringify(sess));
+    }
+    return { user: sess?.user ?? {} };
+  },
+  deleteAccount: async () => {
+    localStorage.removeItem('solace_session');
+    localStorage.removeItem('solace_users');
+  },
+  settings: async () => ({ settings: {} }),
+  saveSettings: async () => {},
+  linkCode: async () => ({ code: 'OFFLINE' }),
+  devices: async () => ({ devices: [] }),
+  revokeDevice: async () => {},
 };
+
+// Keep the bare `api` function as a pass-through no-op for any remaining direct callers.
+export async function api() { return {}; }
