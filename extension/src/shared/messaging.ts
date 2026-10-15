@@ -31,6 +31,7 @@ export type PanelJob =
   | { id: string; createdAt: number; kind: 'navigate'; view: string };
 
 export type ToBackground =
+  | { type: 'TL_PANEL_VISIBILITY'; visible: boolean }
   | { type: 'TL_OPEN_PANEL'; view?: string }
   | { type: 'TL_ANALYZE_TEXT'; mode: 'misinfo' | 'kind' | 'safety'; text: string; senderLabel?: string }
   | { type: 'TL_CAPTURE_EVIDENCE'; text: string; senderLabel?: string }
@@ -55,6 +56,8 @@ export function validateToBackground(m: unknown): ToBackground | null {
   if (!m || typeof m !== 'object') return null;
   const o = m as Record<string, unknown>;
   switch (o.type) {
+    case 'TL_PANEL_VISIBILITY':
+      return typeof o.visible === 'boolean' ? { type: 'TL_PANEL_VISIBILITY', visible: o.visible } : null;
     case 'TL_OPEN_PANEL':
       return o.view === undefined || str(o.view, 40) ? (o as ToBackground) : null;
     case 'TL_ANALYZE_TEXT':

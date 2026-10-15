@@ -31,6 +31,7 @@ const MENU = {
 } as const;
 
 const jobId = () => `job_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+let mimiPanelVisibleUntil = 0;
 
 async function setJob(job: PanelJob) {
   await chrome.storage.session.set({ pendingJob: job });
@@ -182,9 +183,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 /* ---------------- messages from content scripts ---------------- */
 
 chrome.runtime.onMessage.addListener((raw, sender, sendResponse) => {
-  if (sender.id !== chrome.runtime.id || !sender.tab) return false;
+  if (sender.id !== chrome.runtime.id) return false;
   const msg = validateToBackground(raw);
   if (!msg) { sendResponse({ ok: false, error: 'Invalid request.' }); return false; }
+  if (msg.type === 'TL_PANEL_VISIBILITY') {
+    mimiPanelVisibleUntil = msg.visible ? Date.now() + 3500 : 0;
+    sendResponse({ ok: true });
+    return false;
+  }
+  if (!sender.tab) return false;
   const tab = sender.tab;
   const source: SourceInfo = { url: tab.url ?? '', platform: platformFromUrl(tab.url) };
 
@@ -245,6 +252,7 @@ chrome.runtime.onMessageExternal.addListener((raw, sender, sendResponse) => {
   if (msg.type === 'TL_HELLO') {
     getAccount().then((a) => sendResponse({
       ok: true, name: APP.name, assistant: APP.assistant, version: chrome.runtime.getManifest().version,
+      mimiOpen: mimiPanelVisibleUntil > Date.now(),
       account: { status: a.status, ...(a.user && a.status === 'signed-in' ? { userId: a.user.id, email: a.user.email, name: a.user.name } : {}) },
     }));
     return true;

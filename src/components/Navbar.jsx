@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useMimiStatus } from '../lib/mimi';
 
 export default function Navbar({ onSignIn, onDashboard, user }) {
   const [robotHovered, setRobotHovered] = useState(false);
+  const mimiStatus = useMimiStatus();
   const scrollTo = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -57,7 +59,7 @@ export default function Navbar({ onSignIn, onDashboard, user }) {
             boxShadow: '0 0 16px rgba(168, 85, 247, 0.25)',
           }}
         >
-          <img src={robotHovered ? '/robot-jump.gif' : '/solace-robot.png'} alt="" aria-hidden="true" style={{ width: 30, height: 30, objectFit: 'contain', display: 'block' }} />
+          <img src={robotHovered || mimiStatus.mimiOpen ? '/robot-jump.gif' : '/solace-robot.png'} alt="" aria-hidden="true" style={{ width: 30, height: 30, objectFit: 'contain', display: 'block' }} />
         </div>
         <span style={{ fontWeight: 900, color: '#ffffff', fontSize: 19, letterSpacing: '-0.02em', fontFamily: 'inherit' }}>
           Solace

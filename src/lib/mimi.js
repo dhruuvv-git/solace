@@ -58,7 +58,7 @@ export const Mimi = {
     if (!isChromium()) return { installed: false, reason: 'unsupported-browser' };
     const [r, v] = await Promise.all([send({ type: 'TL_HELLO' }, 1500), latestVersion()]);
     if (!r?.ok) return { installed: false, reason: r?.reason || 'not-installed', latestVersion: v };
-    return { installed: true, version: r.version, latestVersion: v, updateAvailable: v ? newer(v, r.version) : false, account: r.account ?? { status: 'signed-out' } };
+    return { installed: true, version: r.version, latestVersion: v, updateAvailable: v ? newer(v, r.version) : false, mimiOpen: !!r.mimiOpen, account: r.account ?? { status: 'signed-out' } };
   },
   open: (view) => send(view ? { type: 'TL_OPEN', view } : { type: 'TL_OPEN' }),
   check: (mode, text) => send({ type: 'TL_CHECK', mode, text: String(text || '').slice(0, 20000) }),
@@ -80,7 +80,8 @@ export function useMimiStatus() {
     refresh();
     const on = () => refresh();
     window.addEventListener('focus', on);
-    return () => window.removeEventListener('focus', on);
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 1200);
+    return () => { window.removeEventListener('focus', on); window.clearInterval(timer); };
   }, [refresh]);
   return { ...status, refresh };
 }

@@ -117,10 +117,10 @@ export default function DashboardView({ tab = 'overview', onTab, mimiStatus, aut
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'vault', label: 'Evidence Vault', icon: ShieldCheck },
-    { id: 'deadlines', label: 'Takedown Deadlines', icon: Clock },
     { id: 'report', label: 'Incident Report', icon: FileText },
     { id: 'crisis', label: 'Emergency Support', icon: PhoneCall },
     { id: 'mimi', label: 'Mimi Extension', icon: Puzzle },
+    { id: 'deadlines', label: 'Takedown Deadlines', icon: Clock },
     { id: 'account', label: 'Account', icon: UserRound },
   ];
 
@@ -229,7 +229,7 @@ export default function DashboardView({ tab = 'overview', onTab, mimiStatus, aut
             </p>
           </div>
           <button onClick={async () => { if (mimiInstalled) { const r = await Mimi.open(); if (!r?.ok) go('mimi'); } else go('mimi'); }} onMouseEnter={() => setMimiHovered(true)} onMouseLeave={() => setMimiHovered(false)} onFocus={() => setMimiHovered(true)} onBlur={() => setMimiHovered(false)} aria-label={mimiLabel} title={mimiLabel} className={`group px-2 py-1.5 min-h-11 rounded-full text-xs font-mono flex items-center gap-2 cursor-pointer border self-start sm:self-auto transition-all duration-300 ${mimiLinked ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : mimiInstalled ? 'bg-amber-500/10 border-amber-500/25 text-amber-700' : 'bg-violet-50 border-violet-200 text-zinc-700'}`} data-testid="mimi-pill">
-            <img src={mimiHovered ? '/robot-jump.gif' : '/solace-robot.png'} alt="" aria-hidden="true" className="w-9 h-9 shrink-0 object-contain" />
+            <img src={mimiHovered || mimiStatus.mimiOpen ? '/robot-jump.gif' : '/solace-robot.png'} alt="" aria-hidden="true" className="w-9 h-9 shrink-0 object-contain" />
             <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-500 delay-100 group-hover:max-w-56 group-hover:opacity-100 group-focus-visible:max-w-56 group-focus-visible:opacity-100">{mimiLabel}</span>
           </button>
         </div>

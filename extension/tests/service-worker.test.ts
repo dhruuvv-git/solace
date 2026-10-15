@@ -128,6 +128,15 @@ describe('service worker', () => {
     expect(r).toMatchObject({ ok: true, assistant: 'Mimi', version: '9.9.9' });
   });
 
+  it('website: HELLO reflects when Mimi is open and clears when it closes', async () => {
+    expect(await ask({ type: 'TL_PANEL_VISIBILITY', visible: true })).toMatchObject({ ok: true });
+    const openedPanel = await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HELLO' }, { origin: 'http://127.0.0.1:5500', tab: { windowId: 3 } }, res); });
+    expect(openedPanel).toMatchObject({ mimiOpen: true });
+    expect(await ask({ type: 'TL_PANEL_VISIBILITY', visible: false })).toMatchObject({ ok: true });
+    const closedPanel = await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HELLO' }, { origin: 'http://127.0.0.1:5500', tab: { windowId: 3 } }, res); });
+    expect(closedPanel).toMatchObject({ mimiOpen: false });
+  });
+
   it('website: blocks other origins and invalid messages', async () => {
     const bad = await new Promise((res) => { for (const f of L.external) f({ type: 'TL_HELLO' }, { origin: 'https://evil.example' }, res); });
     expect(bad).toMatchObject({ ok: false });

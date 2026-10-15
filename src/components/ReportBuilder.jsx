@@ -69,7 +69,7 @@ function ReportDocument({ r }) {
 
       {r.photos.length > 0 && (
         <>
-          <h2 style={{ breakBefore: 'page', pageBreakBefore: 'always' }}>Annexure A — Photographs / screenshots</h2>
+      <h2 style={{ breakBefore: 'page', pageBreakBefore: 'always' }}>Annexure A — Evidence files</h2>
           {r.photos.map((p) => (
             <figure key={p.id}>
               {p.isImage ? <img src={p.url} alt={p.caption || p.name} /> : <div style={{ padding: 16, textAlign: 'center', background: '#f7f5fb' }}>[{p.type || 'file'} — original file to be produced]</div>}
@@ -113,7 +113,25 @@ export default function ReportBuilder({ records, onSealed }) {
   const blocking = missing.filter(([s]) => s === 'bad');
   const otherVault = records.filter((r) => !photos.some((p) => p.hash === r.hash)).length;
 
-  const goStep = (n) => { setStep(n); topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  const hasDate = !!(d.occurredAt || d.discoveredAt);
+  const hasContact = !!(d.phone.trim() || d.email.trim());
+  const requirements = [
+    { ready: hasDate, message: 'Enter when the incident happened or when you found out before continuing.' },
+    { ready: photos.length > 0, message: 'Add at least one photo, screenshot, or other proof before continuing.' },
+    { ready: !!d.name.trim() && hasContact, message: 'Add your name and either a phone number or email before continuing.' },
+  ];
+  const canEnterStep = (n) => {
+    if (n <= step) return true;
+    for (let i = 0; i < n; i++) {
+      if (!requirements[i].ready) { toast(requirements[i].message, 'bad'); return false; }
+    }
+    return true;
+  };
+  const goStep = (n) => {
+    if (!canEnterStep(n)) return;
+    setStep(n);
+    topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const addFiles = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -154,7 +172,9 @@ export default function ReportBuilder({ records, onSealed }) {
     clearDraft(user.id); photos.forEach((p) => URL.revokeObjectURL(p.url)); setPhotos([]); setD(emptyDraft(user)); goStep(0);
   };
 
-  const canNext = step === 0 ? d.type && d.description.trim() : step === 2 ? d.name.trim() && (d.phone.trim() || d.email.trim()) : true;
+  const canNext = requirements[step]?.ready ?? true;
+  const stepHint = ['Enter an incident date or discovery date.', 'Add at least one evidence file.', 'Enter your name and a phone number or email.'][step];
+  const canGenerate = blocking.length === 0;
 
   return (
     <div className="space-y-6" data-testid="report-builder" ref={topRef}>
@@ -194,8 +214,8 @@ export default function ReportBuilder({ records, onSealed }) {
               </div>
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="When did it happen?" hint="Approximate is fine."><input type="datetime-local" className="sol-light-input" value={d.occurredAt} max={maxDate} onChange={set('occurredAt')} /></Field>
-              <Field label="When did you find out?"><input type="datetime-local" className="sol-light-input" value={d.discoveredAt} max={maxDate} onChange={set('discoveredAt')} /></Field>
+              <Field label="When did it happen?" hint="Approximate is fine; the time can be approximate too."><input type="datetime-local" className="sol-light-input" value={d.occurredAt} max={maxDate} onChange={set('occurredAt')} /></Field>
+              <Field label="When did you find out?" hint="Required: enter at least one of these two dates."><input type="datetime-local" className="sol-light-input" value={d.discoveredAt} max={maxDate} onChange={set('discoveredAt')} /></Field>
               <Field label="App / website" hint="e.g. Instagram, WhatsApp, Telegram"><input className="sol-light-input" value={d.platform} onChange={set('platform')} maxLength={120} placeholder="Instagram" /></Field>
               <Field label="Physical place (if any)"><input className="sol-light-input" value={d.location} onChange={set('location')} maxLength={200} placeholder="e.g. outside my college, Pune" /></Field>
             </div>
@@ -254,11 +274,11 @@ export default function ReportBuilder({ records, onSealed }) {
         <div className={`${card} space-y-5`}>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h4 className="text-base font-bold text-[#1a1028] flex items-center gap-2"><ImagePlus className="w-5 h-5 text-purple-600" />Add photos and screenshots</h4>
-              <p className="text-xs text-zinc-600 mt-1 max-w-xl">Screenshots of messages, profiles and posts (with the date and username visible), photos of injuries or damage, payment receipts. Each one is fingerprinted (SHA-256) so you can prove it hasn’t been edited.</p>
+              <h4 className="text-base font-bold text-[#1a1028] flex items-center gap-2"><ImagePlus className="w-5 h-5 text-purple-600" />Add proof files</h4>
+              <p className="text-xs text-zinc-600 mt-1 max-w-xl">At least one proof file is required. Add screenshots, photos, receipts, documents, or any other evidence file. Each one is fingerprinted (SHA-256) so you can check it has not changed.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <input ref={pickRef} type="file" multiple accept="image/*,video/*,audio/*,application/pdf" className="hidden" onChange={addFiles} data-testid="report-photos" />
+              <input ref={pickRef} type="file" multiple className="hidden" onChange={addFiles} data-testid="report-photos" />
               <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={addFiles} />
               <button onClick={() => camRef.current?.click()} className={softBtn}><Camera className="w-4 h-4" />Take photo</button>
               <button onClick={() => pickRef.current?.click()} disabled={adding > 0} className={primaryBtn}>{adding ? <span className="sol-spinner" /> : <ImagePlus className="w-4 h-4" />}{adding ? 'Fingerprinting…' : 'Add photos / files'}</button>
@@ -309,6 +329,7 @@ export default function ReportBuilder({ records, onSealed }) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className={`${card} lg:col-span-2 space-y-5`}>
             <h4 className="text-base font-bold text-[#1a1028]">Your details</h4>
+            <p className="text-xs text-zinc-600">Required: your name and either a phone number or email. Address, age, station, and other details are optional.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Full name (as on ID)"><input className="sol-light-input" value={d.name} onChange={set('name')} maxLength={120} autoComplete="name" /></Field>
               <Field label="Age (optional)"><input inputMode="numeric" className="sol-light-input" value={d.age} onChange={(e) => set('age')(e.target.value.replace(/\D/g, '').slice(0, 3))} /></Field>
@@ -342,9 +363,9 @@ export default function ReportBuilder({ records, onSealed }) {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 space-y-3">
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => window.print()} className={primaryBtn}><Printer className="w-4 h-4" />Print / Save as PDF</button>
-              <button onClick={copy} className={softBtn}>{copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}{copied ? 'Copied!' : 'Copy text'}</button>
-              <button onClick={downloadTxt} className={softBtn}><Download className="w-4 h-4" />Download .txt</button>
+              <button onClick={() => window.print()} disabled={!canGenerate} className={primaryBtn}><Printer className="w-4 h-4" />Print / Save as PDF</button>
+              <button onClick={copy} disabled={!canGenerate} className={softBtn}>{copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}{copied ? 'Copied!' : 'Copy text'}</button>
+              <button onClick={downloadTxt} disabled={!canGenerate} className={softBtn}><Download className="w-4 h-4" />Download .txt</button>
             </div>
             <div className="rounded-2xl border border-violet-100 bg-white shadow-[0_16px_48px_rgba(124,58,237,0.10)] p-6 sm:p-10 overflow-x-auto" data-testid="report-preview">
               <ReportDocument r={report} />
@@ -358,8 +379,8 @@ export default function ReportBuilder({ records, onSealed }) {
                   {missing.map(([sev, m]) => <li key={m} className={`text-xs flex gap-2 ${sev === 'bad' ? 'text-rose-700' : 'text-amber-700'}`}><span className="mt-0.5">{sev === 'bad' ? '●' : '○'}</span>{m}</li>)}
                 </ul>
               )}
-              {missing.length > 0 && <p className="text-[11px] text-zinc-500 mt-3">Anything in [brackets] still needs filling in.</p>}
-              {blocking.length > 0 && <button onClick={() => goStep(blocking[0][1].includes('name') || blocking[0][1].includes('phone') ? 2 : 0)} className="mt-3 text-xs font-mono text-purple-700 underline underline-offset-2 cursor-pointer">Fix the first one</button>}
+              {missing.length > 0 && <p className="text-[11px] text-zinc-500 mt-3">Items marked in red are required. Details marked in amber are optional; the report won’t invent missing facts.</p>}
+              {blocking.length > 0 && <button onClick={() => goStep(blocking[0][1].includes('name') || blocking[0][1].includes('phone') || blocking[0][1].includes('email') ? 2 : blocking[0][1].includes('proof') ? 1 : 0)} className="mt-3 text-xs font-mono text-purple-700 underline underline-offset-2 cursor-pointer">Fix the first required item</button>}
             </div>
             <div className={card}>
               <h4 className="text-sm font-bold text-[#1a1028]">How to submit it</h4>
@@ -393,14 +414,14 @@ export default function ReportBuilder({ records, onSealed }) {
         <button onClick={() => goStep(step - 1)} disabled={step === 0} className={`${softBtn} disabled:opacity-40 disabled:cursor-not-allowed`}><ArrowLeft className="w-4 h-4" />Back</button>
         {step < STEPS.length - 1 && (
           <div className="flex items-center gap-3">
-            {!canNext && <span className="text-[11px] text-zinc-500 hidden sm:inline">{step === 0 ? 'Choose a type and describe what happened' : 'Add your name and a phone or email'}</span>}
+            {!canNext && <span className="text-[11px] text-zinc-500 hidden sm:inline">{stepHint}</span>}
             <button onClick={() => goStep(step + 1)} disabled={!canNext} className={primaryBtn}>Next: {STEPS[step + 1]}<ArrowRight className="w-4 h-4" /></button>
           </div>
         )}
-        {step === STEPS.length - 1 && <button onClick={() => window.print()} className={primaryBtn}><Printer className="w-4 h-4" />Print / Save as PDF</button>}
+        {step === STEPS.length - 1 && <button onClick={() => window.print()} disabled={!canGenerate} className={primaryBtn}><Printer className="w-4 h-4" />Print / Save as PDF</button>}
       </div>
 
-      {createPortal(<div className="sol-print-root"><ReportDocument r={report} /></div>, document.body)}
+      {canGenerate && createPortal(<div className="sol-print-root"><ReportDocument r={report} /></div>, document.body)}
     </div>
   );
 }

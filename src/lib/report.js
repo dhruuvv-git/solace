@@ -76,11 +76,11 @@ export function provisions(d) {
 /** What is still missing, most important first. */
 export function gaps(d, photos) {
   const g = [];
-  if (!d.type) g.push(['bad', 'Choose what kind of incident this is.']);
-  if (d.description.trim().length < 40) g.push(['bad', 'Describe what happened in a few sentences.']);
-  if (!d.occurredAt && !d.discoveredAt) g.push(['warn', 'Add when it happened or when you found it.']);
+  if (!d.occurredAt && !d.discoveredAt) g.push(['bad', 'Enter the date it happened or the date you found out.']);
+  if (!d.type) g.push(['warn', 'Choose an incident type if you know it; otherwise the report will use a general description.']);
+  if (!d.description.trim()) g.push(['warn', 'Add a short description if you can. Words like “about” or “I think” are fine; don’t guess.']);
   if (!d.platform && !d.location) g.push(['warn', 'Add where it happened (app, website or place).']);
-  if (!photos.length) g.push(['warn', 'Add screenshots or photos — they are the strongest evidence.']);
+  if (!photos.length) g.push(['bad', 'Add at least one photo, screenshot, or other proof file before making the report.']);
   if (d.suspect !== 'unknown' && !d.suspectName && !d.suspectHandles) g.push(['warn', 'Add the name, username or number of the person responsible.']);
   if (['impersonation', 'deepfake', 'intimate-images', 'harassment'].includes(d.type) && !lines(d.links).length) g.push(['warn', 'Paste the links (URLs) to the posts, profiles or chats.']);
   if (d.moneyDemanded && !d.amount) g.push(['warn', 'Add the amount demanded or paid.']);
@@ -114,7 +114,8 @@ export function buildReport(d, photos, vaultRecords, now = Date.now()) {
   if (d.occurredAt) timing.push(`The incident took place on or about ${when(d.occurredAt)}`);
   if (d.discoveredAt) timing.push(`${timing.length ? 'I' : 'I first'} became aware of it on ${when(d.discoveredAt)}`);
   if (timing.length) statement.push(`${timing.join(', and ')}.`);
-  statement.push(...lines(d.description));
+  const description = lines(d.description);
+  statement.push(...(description.length ? description : ['I am reporting this incident and request that the attached evidence be reviewed. I am unable to provide further details at this time.']));
   const facts = [];
   if (d.threats) facts.push('I have been threatened by the person(s) responsible.');
   if (d.moneyDemanded) facts.push(`Money was demanded from me${d.amount ? ` (amount: ₹${d.amount})` : ''}.`);
@@ -124,7 +125,7 @@ export function buildReport(d, photos, vaultRecords, now = Date.now()) {
   if (facts.length) statement.push(facts.join(' '));
   if (d.witnesses.trim()) statement.push(`The following people are aware of or witnessed these events: ${d.witnesses.trim()}.`);
   statement.push(photos.length
-    ? `I have attached ${photos.length} photograph(s) / screenshot(s) as Annexure A. Each file’s SHA-256 fingerprint was computed on my device when this complaint was prepared, so it can be shown that the files have not been altered. I am preserving the original files and the device(s) they are on.`
+    ? `I have attached ${photos.length} evidence file(s) as Annexure A. Each file’s SHA-256 fingerprint was computed on my device when this complaint was prepared, so it can be shown that the files have not been altered. I am preserving the original files and the device(s) they are on.`
     : 'I am preserving all messages, screenshots and the device(s) involved and will produce them when asked.');
 
   const accused = d.suspect === 'unknown'

@@ -8,7 +8,7 @@ import { SafetyShield } from '../shields/safety/SafetyShield';
 import { VIEWS, useApp, type View } from './app-context';
 import { Icon, useToast } from './components';
 import { APP } from '../shared/app-config';
-import { assetUrl, openWebsite } from './env';
+import { assetUrl, isExtension, openWebsite } from './env';
 import { Overview } from './Overview';
 import { SettingsView } from './SettingsView';
 import { AccountChip } from '../account/AccountUI';
@@ -106,6 +106,26 @@ export function AppShell({ compact = false }: { compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   const current = VIEWS.find((v) => v.id === view);
+  useEffect(() => {
+    if (!isExtension()) return;
+    const announce = () => {
+      const visible = document.visibilityState === 'visible';
+      try { chrome.runtime.sendMessage({ type: 'TL_PANEL_VISIBILITY', visible }, () => { void chrome.runtime.lastError; }); } catch { /* extension context may have closed */ }
+    };
+    const onPageHide = () => {
+      try { chrome.runtime.sendMessage({ type: 'TL_PANEL_VISIBILITY', visible: false }, () => { void chrome.runtime.lastError; }); } catch { /* extension context may have closed */ }
+    };
+    announce();
+    const timer = window.setInterval(announce, 1000);
+    document.addEventListener('visibilitychange', announce);
+    window.addEventListener('pagehide', onPageHide, { once: true });
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', announce);
+      window.removeEventListener('pagehide', onPageHide);
+      onPageHide();
+    };
+  }, []);
   return (
     <div className="shell" style={{ maxWidth: compact ? undefined : 720, margin: '0 auto' }}>
       <header className="shell-head">
