@@ -107,8 +107,11 @@
 @keyframes sol-bob { 50% { transform: translateY(-6px); } }
 
 /* ---------- landing page responsive layer (keeps the desktop design as authored) ---------- */
+@media (max-width: 1200px) {
+  .sol-grid-5 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
 @media (max-width: 1100px) {
-  .sol-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .sol-grid-4, .sol-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .sol-grid-2 { gap: 56px !important; }
 }
 @media (max-width: 900px) {
@@ -121,7 +124,7 @@
   .sol-footer { padding: 48px 24px !important; }
 }
 @media (max-width: 560px) {
-  .sol-grid-4 { grid-template-columns: 1fr !important; }
+  .sol-grid-4, .sol-grid-5 { grid-template-columns: 1fr !important; }
   .sol-cta-big { padding: 20px 32px !important; font-size: 17px !important; white-space: normal !important; }
   .sol-hero { padding-left: 20px !important; padding-right: 20px !important; }
 }

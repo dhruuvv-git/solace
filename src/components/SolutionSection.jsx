@@ -1,11 +1,12 @@
+import { useState } from 'react';
 import { FadeUp } from './FadeUp';
 import TextType from './TextType';
 
 const steps = [
   {
     step: '01',
-    header: 'Triage',
-    summary: 'Instant categorization. Intimate threats routed to 2-hr priority; extortion to 1930.',
+    header: 'Triage & Countdown',
+    summary: "Instant categorization & live tracker for India's 2-hour to 36-hour statutory platform takedown deadlines.",
     accent: '#a855f7',
     accentBg: 'rgba(168,85,247,0.1)',
   },
@@ -18,8 +19,8 @@ const steps = [
   },
   {
     step: '03',
-    header: 'Countdown',
-    summary: "Live tracker for India's 2-hour to 36-hour statutory platform takedown deadlines.",
+    header: 'Aftercare',
+    summary: 'Compassionate recovery support, guided panic de-escalation with Mimi, and anonymous peer listening circles.',
     accent: '#f59e0b',
     accentBg: 'rgba(245,158,11,0.1)',
   },
@@ -30,9 +31,18 @@ const steps = [
     accent: '#10b981',
     accentBg: 'rgba(16,185,129,0.1)',
   },
+  {
+    step: '05',
+    header: 'Mimi Companion',
+    summary: 'Smart browser protection, automated evidence capture, and an empathetic voice whenever you need support.',
+    accent: '#ec4899',
+    accentBg: 'rgba(236,72,153,0.1)',
+    isMimi: true,
+  },
 ];
 
 export default function SolutionSection({ onGetStarted }) {
+  const [hoveredIdx, setHoveredIdx] = useState(null);
   return (
     <section
       id="solution"
@@ -111,22 +121,22 @@ export default function SolutionSection({ onGetStarted }) {
           </FadeUp>
         </div>
 
-        {/* 4 Step Cards */}
-        <div className="sol-grid-4" style={{
+        {/* Step Cards */}
+        <div className="sol-grid-5" style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: 28,
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          gap: 20,
           marginBottom: 100,
         }}>
           {steps.map((item, idx) => (
-            <FadeUp key={item.step} delay={200 + idx * 80}>
+            <FadeUp key={item.step} delay={200 + idx * 70}>
               <div
                 style={{
-                  padding: '40px 32px',
+                  padding: '36px 26px',
                   borderRadius: 24,
                   background: '#ffffff',
-                  border: '1px solid #ede9fe',
-                  boxShadow: '0 4px 24px rgba(124,58,237,0.07)',
+                  border: item.isMimi ? '1px solid #ddd6fe' : '1px solid #ede9fe',
+                  boxShadow: item.isMimi ? '0 4px 28px rgba(168,85,247,0.12)' : '0 4px 24px rgba(124,58,237,0.07)',
                   transition: 'transform 0.25s, box-shadow 0.25s',
                   cursor: 'default',
                   height: '100%',
@@ -136,32 +146,57 @@ export default function SolutionSection({ onGetStarted }) {
                   gap: 16,
                 }}
                 onMouseEnter={e => {
+                  setHoveredIdx(idx);
                   e.currentTarget.style.transform = 'translateY(-4px)';
                   e.currentTarget.style.boxShadow = '0 16px 48px rgba(124,58,237,0.14)';
                 }}
                 onMouseLeave={e => {
+                  setHoveredIdx(null);
                   e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 24px rgba(124,58,237,0.07)';
+                  e.currentTarget.style.boxShadow = item.isMimi ? '0 4px 28px rgba(168,85,247,0.12)' : '0 4px 24px rgba(124,58,237,0.07)';
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{
-                    fontFamily: 'monospace', fontSize: 36, fontWeight: 900,
+                    fontFamily: 'monospace', fontSize: 34, fontWeight: 900,
                     color: '#ddd6fe', lineHeight: 1,
                   }}>
                     {item.step}
                   </span>
-                  <span style={{
-                    width: 12, height: 12, borderRadius: '50%',
-                    background: item.accent,
-                    boxShadow: `0 0 12px ${item.accent}`,
-                    flexShrink: 0,
-                    marginTop: 6,
-                  }} />
+                  {item.isMimi ? (
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 12,
+                        background: 'rgba(168, 85, 247, 0.12)',
+                        border: '1px solid rgba(168, 85, 247, 0.3)',
+                        display: 'grid',
+                        placeItems: 'center',
+                        boxShadow: '0 0 16px rgba(168, 85, 247, 0.25)',
+                        transition: 'transform 0.25s ease',
+                        transform: hoveredIdx === idx ? 'scale(1.12)' : 'scale(1)',
+                      }}
+                      title="Mimi Companion"
+                    >
+                      <img
+                        src={hoveredIdx === idx ? '/robot-jump.gif' : '/solace-robot.png'}
+                        alt="Mimi"
+                        style={{ width: 26, height: 26, objectFit: 'contain' }}
+                      />
+                    </div>
+                  ) : (
+                    <span style={{
+                      width: 12, height: 12, borderRadius: '50%',
+                      background: item.accent,
+                      boxShadow: `0 0 12px ${item.accent}`,
+                      flexShrink: 0,
+                    }} />
+                  )}
                 </div>
 
                 <h3 style={{
-                  fontSize: 22,
+                  fontSize: 20,
                   fontWeight: 800,
                   color: '#1a1028',
                   letterSpacing: '-0.01em',
@@ -170,9 +205,9 @@ export default function SolutionSection({ onGetStarted }) {
                 </h3>
 
                 <p style={{
-                  fontSize: 15,
+                  fontSize: 14,
                   color: '#6b7280',
-                  lineHeight: 1.7,
+                  lineHeight: 1.65,
                   fontWeight: 400,
                 }}>
                   {item.summary}

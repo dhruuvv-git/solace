@@ -179,7 +179,11 @@ export default function DashboardView({ tab = 'overview', onTab, mimiStatus, aut
             return (
               <button key={item.id} onClick={() => go(item.id)} aria-current={isActive ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium tracking-wide transition-all cursor-pointer ${isActive ? 'bg-purple-600/20 text-[#1a1028] font-semibold border border-purple-500/40 shadow-[0_0_14px_rgba(168,85,247,0.25)]' : 'text-zinc-600 hover:text-[#5b21b6] hover:bg-violet-50 border border-transparent'}`}>
-                <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-600' : 'text-zinc-500'}`} />
+                {item.id === 'mimi' ? (
+                  <img src="/solace-robot.png" alt="" className="w-4 h-4 object-contain" />
+                ) : (
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-600' : 'text-zinc-500'}`} />
+                )}
                 <span className="flex-1 text-left">{item.label}</span>
                 {item.id === 'mimi' && <span className={`w-1.5 h-1.5 rounded-full ${mimiLinked ? 'bg-emerald-400' : mimiInstalled ? 'bg-amber-400' : 'bg-zinc-600'}`} aria-hidden="true" />}
               </button>
